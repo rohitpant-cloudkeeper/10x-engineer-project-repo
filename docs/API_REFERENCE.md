@@ -16,6 +16,7 @@ Complete API documentation for the PromptLab REST API.
 - [Health Check](#health-check)
 - [Prompts](#prompts)
 - [Collections](#collections)
+- [Tags](#tags)
 
 ---
 
@@ -158,6 +159,7 @@ Retrieve all prompts with optional filtering.
 |-----------|------|----------|-------------|
 | collection_id | string | No | Filter by collection ID |
 | search | string | No | Search in title and description |
+| tags | string | No | Comma-separated list of tags (AND logic) |
 
 **Response:** `200 OK`
 
@@ -170,6 +172,7 @@ Retrieve all prompts with optional filtering.
       "content": "Review the following code:\n\n{{code}}",
       "description": "AI code review assistant",
       "collection_id": "660e8400-e29b-41d4-a716-446655440000",
+      "tags": ["python", "code-review"],
       "created_at": "2024-01-15T10:30:00Z",
       "updated_at": "2024-01-15T10:30:00Z"
     }
@@ -189,6 +192,15 @@ curl "http://localhost:8000/prompts?collection_id=660e8400-e29b-41d4-a716-446655
 
 # Search prompts
 curl "http://localhost:8000/prompts?search=code+review"
+
+# Filter by tags (single tag)
+curl "http://localhost:8000/prompts?tags=python"
+
+# Filter by multiple tags (AND logic)
+curl "http://localhost:8000/prompts?tags=python,code-review"
+
+# Combine filters
+curl "http://localhost:8000/prompts?tags=python&collection_id=660e8400-e29b-41d4-a716-446655440000&search=review"
 ```
 
 ---
@@ -214,6 +226,7 @@ Retrieve a specific prompt by ID.
   "content": "Review the following code:\n\n{{code}}",
   "description": "AI code review assistant",
   "collection_id": "660e8400-e29b-41d4-a716-446655440000",
+  "tags": ["python", "code-review"],
   "created_at": "2024-01-15T10:30:00Z",
   "updated_at": "2024-01-15T10:30:00Z"
 }
@@ -244,7 +257,8 @@ Create a new prompt.
   "title": "Code Review Prompt",
   "content": "Review the following code:\n\n{{code}}",
   "description": "AI code review assistant",
-  "collection_id": "660e8400-e29b-41d4-a716-446655440000"
+  "collection_id": "660e8400-e29b-41d4-a716-446655440000",
+  "tags": ["python", "code-review"]
 }
 ```
 
@@ -256,6 +270,7 @@ Create a new prompt.
 | content | string | Yes | Min 1 char | Prompt content with optional {{variables}} |
 | description | string | No | Max 500 chars | Optional description |
 | collection_id | string | No | Valid UUID | Optional collection reference |
+| tags | array | No | Max 10 tags, 1-30 chars each | Optional tags for categorization |
 
 **Response:** `201 Created`
 
@@ -266,6 +281,7 @@ Create a new prompt.
   "content": "Review the following code:\n\n{{code}}",
   "description": "AI code review assistant",
   "collection_id": "660e8400-e29b-41d4-a716-446655440000",
+  "tags": ["python", "code-review"],
   "created_at": "2024-01-15T10:30:00Z",
   "updated_at": "2024-01-15T10:30:00Z"
 }
@@ -584,6 +600,126 @@ curl -X DELETE http://localhost:8000/collections/660e8400-e29b-41d4-a716-4466554
 
 ---
 
+## Tags
+
+### List All Tags
+
+Retrieve all tags with optional search filtering.
+
+**Endpoint:** `GET /tags`
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| search | string | No | Search tags by name (partial match) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "tags": [
+    {
+      "name": "python",
+      "usage_count": 15,
+      "created_at": "2024-01-10T09:00:00Z"
+    },
+    {
+      "name": "code-review",
+      "usage_count": 12,
+      "created_at": "2024-01-10T10:00:00Z"
+    }
+  ],
+  "total": 2
+}
+```
+
+**Example Requests:**
+
+```bash
+# Get all tags
+curl http://localhost:8000/tags
+
+# Search tags
+curl "http://localhost:8000/tags?search=python"
+```
+
+---
+
+### Get Tag Details
+
+Retrieve a specific tag by name.
+
+**Endpoint:** `GET /tags/{tag_name}`
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| tag_name | string | Yes | Tag name |
+
+**Response:** `200 OK`
+
+```json
+{
+  "name": "python",
+  "usage_count": 15,
+  "created_at": "2024-01-10T09:00:00Z"
+}
+```
+
+**Error Responses:**
+
+- `404 Not Found` - Tag does not exist
+
+**Example Request:**
+
+```bash
+curl http://localhost:8000/tags/python
+```
+
+---
+
+### Get Popular Tags
+
+Retrieve popular tags sorted by usage count.
+
+**Endpoint:** `GET /tags/popular`
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| limit | integer | No | Maximum number of tags to return (default: 10) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "tags": [
+    {
+      "name": "python",
+      "usage_count": 15,
+      "created_at": "2024-01-10T09:00:00Z"
+    },
+    {
+      "name": "code-review",
+      "usage_count": 12,
+      "created_at": "2024-01-10T10:00:00Z"
+    }
+  ],
+  "total": 2
+}
+```
+
+**Example Request:**
+
+```bash
+curl "http://localhost:8000/tags/popular?limit=5"
+```
+
+---
+
 ## Data Models
 
 ### Prompt Model
@@ -595,8 +731,27 @@ curl -X DELETE http://localhost:8000/collections/660e8400-e29b-41d4-a716-4466554
   "content": "string (min 1 char)",
   "description": "string | null (max 500 chars)",
   "collection_id": "string | null (UUID)",
+  "tags": "array of strings (max 10, each 1-30 chars, lowercase alphanumeric and hyphens)",
   "created_at": "string (ISO 8601 datetime)",
   "updated_at": "string (ISO 8601 datetime)"
+}
+```
+
+**Tag Validation Rules:**
+- Tags are automatically normalized to lowercase
+- Spaces are replaced with hyphens
+- Only alphanumeric characters and hyphens allowed
+- Each tag must be 1-30 characters
+- Maximum 10 tags per prompt
+- Duplicate tags are automatically removed
+
+### Tag Model
+
+```json
+{
+  "name": "string (1-30 chars, lowercase alphanumeric and hyphens)",
+  "usage_count": "integer (non-negative)",
+  "created_at": "string (ISO 8601 datetime)"
 }
 ```
 
@@ -685,6 +840,8 @@ curl http://localhost:8000/prompts
 - Initial API release
 - CRUD operations for prompts
 - CRUD operations for collections
+- Tagging system with tag management
+- Tag filtering with AND logic
 - Search and filter functionality
 - Partial update support (PATCH)
 
