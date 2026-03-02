@@ -5,7 +5,7 @@ It handles request validation, business logic, and response formatting for
 prompts and collections management.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 
@@ -14,6 +14,7 @@ from app.models import (
     Collection, CollectionCreate,
     PromptList, CollectionList, HealthResponse,
     Tag, TagList,
+    PromptVersion, PromptVersionList, VersionComparison,
     get_current_time
 )
 from app.storage import storage
@@ -58,6 +59,29 @@ def health_check():
         {'status': 'healthy', 'version': '0.1.0'}
     """
     return HealthResponse(status="healthy", version=__version__)
+
+
+# ============== Helper Functions ==============
+
+def create_prompt_version(prompt: Prompt) -> PromptVersion:
+    """Create a version from the current prompt state.
+    
+    Args:
+        prompt: The prompt to create a version from.
+        
+    Returns:
+        PromptVersion: The created version object.
+    """
+    version = PromptVersion(
+        prompt_id=prompt.id,
+        version=prompt.version,
+        title=prompt.title,
+        content=prompt.content,
+        description=prompt.description,
+        collection_id=prompt.collection_id,
+        tags=prompt.tags.copy() if prompt.tags else []
+    )
+    return storage.create_version(version)
 
 
 # ============== Prompt Endpoints ==============
@@ -183,7 +207,12 @@ def create_prompt(prompt_data: PromptCreate):
     for tag in normalized_tags:
         storage.create_or_update_tag(tag)
     
-    return storage.create_prompt(prompt)
+    created_prompt = storage.create_prompt(prompt)
+    
+    # Create initial version
+    create_prompt_version(created_prompt)
+    
+    return created_prompt
 
 
 @app.put("/prompts/{prompt_id}", response_model=Prompt)
@@ -244,7 +273,17 @@ def update_prompt(prompt_id: str, prompt_data: PromptUpdate):
     for tag in normalized_tags:
         storage.create_or_update_tag(tag)
     
-    return storage.update_prompt(prompt_id, updated_prompt)
+    # Increment version
+    updated_prompt.version = existing.version + 1
+    updated_prompt.version_count = existing.version_count + 1
+    
+    # Save updated prompt
+    result = storage.update_prompt(prompt_id, updated_prompt)
+    
+    # Create new version
+    create_prompt_version(updated_prompt)
+    
+    return result
 
 
 @app.patch("/prompts/{prompt_id}", response_model=Prompt)
@@ -306,11 +345,18 @@ def patch_prompt(prompt_id: str, prompt_data: PromptPatch):
         description=update_data.get('description', existing.description),
         collection_id=update_data.get('collection_id', existing.collection_id),
         tags=update_data.get('tags', existing.tags),
+        version=existing.version + 1,
+        version_count=existing.version_count + 1,
         created_at=existing.created_at,
         updated_at=get_current_time()
     )
     
-    return storage.update_prompt(prompt_id, updated_prompt)
+    result = storage.update_prompt(prompt_id, updated_prompt)
+    
+    # Create new version
+    create_prompt_version(updated_prompt)
+    
+    return result
 
 
 @app.delete("/prompts/{prompt_id}", status_code=204)
@@ -342,6 +388,9 @@ def delete_prompt(prompt_id: str):
     # Decrement usage count for all tags
     for tag in prompt.tags:
         storage.update_tag_usage(tag, -1)
+    
+    # Delete all versions
+    storage.delete_versions_for_prompt(prompt_id)
     
     # Delete the prompt
     storage.delete_prompt(prompt_id)
@@ -532,3 +581,202 @@ def get_tag(tag_name: str):
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
     return tag
+
+
+# ============== Version Endpoints ==============
+
+@app.get("/prompts/{prompt_id}/versions", response_model=PromptVersionList)
+def list_prompt_versions(
+    prompt_id: str,
+    limit: int = 50,
+    offset: int = 0
+):
+    """List all versions of a prompt.
+    
+    Retrieves version history for a specific prompt, sorted by version number
+    (newest first). Supports pagination.
+    
+    Args:
+        prompt_id: The unique identifier of the prompt.
+        limit: Maximum number of versions to return (default: 50).
+        offset: Number of versions to skip (default: 0).
+        
+    Returns:
+        PromptVersionList: Object containing versions, total count, and prompt ID.
+        
+    Raises:
+        HTTPException: 404 if prompt not found.
+        
+    Examples:
+        >>> response = client.get("/prompts/abc123/versions")
+        >>> response = client.get("/prompts/abc123/versions?limit=10&offset=5")
+    """
+    # Verify prompt exists
+    prompt = storage.get_prompt(prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    
+    # Get all versions
+    all_versions = storage.get_versions(prompt_id)
+    total = len(all_versions)
+    
+    # Apply pagination
+    versions = all_versions[offset:offset + limit]
+    
+    return PromptVersionList(
+        versions=versions,
+        total=total,
+        prompt_id=prompt_id
+    )
+
+
+@app.get("/prompts/{prompt_id}/versions/compare", response_model=VersionComparison)
+def compare_versions(
+    prompt_id: str,
+    from_version: int = Query(..., alias="from"),
+    to_version: int = Query(..., alias="to")
+):
+    """Compare two versions of a prompt.
+    
+    Args:
+        prompt_id: The unique identifier of the prompt.
+        from_version: First version number (query parameter: from).
+        to_version: Second version number (query parameter: to).
+        
+    Returns:
+        VersionComparison: Object containing both versions and changes.
+        
+    Raises:
+        HTTPException: 404 if prompt or either version not found.
+        
+    Examples:
+        >>> response = client.get("/prompts/abc123/versions/compare?from=1&to=3")
+    """
+    # Verify prompt exists
+    prompt = storage.get_prompt(prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    
+    # Get both versions
+    v1 = storage.get_version(prompt_id, from_version)
+    if not v1:
+        raise HTTPException(status_code=404, detail=f"Version {from_version} not found")
+    
+    v2 = storage.get_version(prompt_id, to_version)
+    if not v2:
+        raise HTTPException(status_code=404, detail=f"Version {to_version} not found")
+    
+    # Detect changes
+    changes = {
+        "title": "changed" if v1.title != v2.title else "unchanged",
+        "content": "changed" if v1.content != v2.content else "unchanged",
+        "description": "changed" if v1.description != v2.description else "unchanged",
+        "collection_id": "changed" if v1.collection_id != v2.collection_id else "unchanged",
+        "tags": "changed" if v1.tags != v2.tags else "unchanged"
+    }
+    
+    return VersionComparison(
+        prompt_id=prompt_id,
+        from_version=v1,
+        to_version=v2,
+        changes=changes
+    )
+
+
+@app.get("/prompts/{prompt_id}/versions/{version}", response_model=PromptVersion)
+def get_prompt_version(prompt_id: str, version: int):
+    """Get a specific version of a prompt.
+    
+    Args:
+        prompt_id: The unique identifier of the prompt.
+        version: The version number to retrieve.
+        
+    Returns:
+        PromptVersion: The requested version object.
+        
+    Raises:
+        HTTPException: 404 if prompt or version not found.
+        
+    Examples:
+        >>> response = client.get("/prompts/abc123/versions/2")
+    """
+    # Verify prompt exists
+    prompt = storage.get_prompt(prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    
+    # Get version
+    prompt_version = storage.get_version(prompt_id, version)
+    if not prompt_version:
+        raise HTTPException(status_code=404, detail="Version not found")
+    
+    return prompt_version
+
+
+@app.post("/prompts/{prompt_id}/versions/{version}/revert", response_model=Prompt)
+def revert_to_version(prompt_id: str, version: int):
+    """Revert a prompt to a previous version.
+    
+    Creates a new version with the content from the specified version.
+    Does not delete any history.
+    
+    Args:
+        prompt_id: The unique identifier of the prompt.
+        version: The version number to revert to.
+        
+    Returns:
+        Prompt: The updated prompt object with new version number.
+        
+    Raises:
+        HTTPException: 404 if prompt or version not found.
+        HTTPException: 400 if trying to revert to current version.
+        
+    Examples:
+        >>> response = client.post("/prompts/abc123/versions/2/revert")
+    """
+    # Verify prompt exists
+    existing = storage.get_prompt(prompt_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    
+    # Check if reverting to current version
+    if version == existing.version:
+        raise HTTPException(
+            status_code=400,
+            detail="Already on this version. Cannot revert to current version."
+        )
+    
+    # Get version to revert to
+    target_version = storage.get_version(prompt_id, version)
+    if not target_version:
+        raise HTTPException(status_code=404, detail="Version not found")
+    
+    # Update tag usage counts
+    # Remove old tags
+    for tag in existing.tags:
+        storage.update_tag_usage(tag, -1)
+    # Add tags from target version
+    for tag in target_version.tags:
+        storage.create_or_update_tag(tag)
+    
+    # Create updated prompt with content from target version
+    reverted_prompt = Prompt(
+        id=existing.id,
+        title=target_version.title,
+        content=target_version.content,
+        description=target_version.description,
+        collection_id=target_version.collection_id,
+        tags=target_version.tags.copy() if target_version.tags else [],
+        version=existing.version + 1,
+        version_count=existing.version_count + 1,
+        created_at=existing.created_at,
+        updated_at=get_current_time()
+    )
+    
+    # Save updated prompt
+    result = storage.update_prompt(prompt_id, reverted_prompt)
+    
+    # Create new version
+    create_prompt_version(reverted_prompt)
+    
+    return result
