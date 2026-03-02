@@ -17,6 +17,7 @@ Complete API documentation for the PromptLab REST API.
 - [Prompts](#prompts)
 - [Collections](#collections)
 - [Tags](#tags)
+- [Version History](#version-history)
 
 ---
 
@@ -720,6 +721,250 @@ curl "http://localhost:8000/tags/popular?limit=5"
 
 ---
 
+## Version History
+
+PromptLab automatically tracks the complete history of every prompt. Every update (PUT/PATCH) creates a new version, allowing you to view history, compare changes, and revert to previous states.
+
+### List Prompt Versions
+
+Retrieve all versions of a specific prompt.
+
+**Endpoint:** `GET /prompts/{prompt_id}/versions`
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| prompt_id | string | Yes | Unique prompt identifier |
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| limit | integer | No | Maximum number of versions to return (default: 50) |
+| offset | integer | No | Number of versions to skip (default: 0) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "versions": [
+    {
+      "id": "version-uuid-2",
+      "prompt_id": "prompt-uuid",
+      "version": 2,
+      "title": "Updated Title",
+      "content": "Updated content",
+      "description": "Updated description",
+      "collection_id": "collection-uuid",
+      "tags": ["python", "updated"],
+      "created_at": "2024-01-15T11:00:00Z",
+      "created_by": null
+    },
+    {
+      "id": "version-uuid-1",
+      "prompt_id": "prompt-uuid",
+      "version": 1,
+      "title": "Original Title",
+      "content": "Original content",
+      "description": "Original description",
+      "collection_id": null,
+      "tags": ["python"],
+      "created_at": "2024-01-15T10:00:00Z",
+      "created_by": null
+    }
+  ],
+  "total": 2,
+  "prompt_id": "prompt-uuid"
+}
+```
+
+**Error Responses:**
+
+- `404 Not Found` - Prompt does not exist
+
+**Example Requests:**
+
+```bash
+# Get all versions
+curl "http://localhost:8000/prompts/550e8400-e29b-41d4-a716-446655440000/versions"
+
+# Get with pagination
+curl "http://localhost:8000/prompts/550e8400-e29b-41d4-a716-446655440000/versions?limit=10&offset=5"
+```
+
+---
+
+### Get Specific Version
+
+Retrieve a specific version of a prompt by version number.
+
+**Endpoint:** `GET /prompts/{prompt_id}/versions/{version}`
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| prompt_id | string | Yes | Unique prompt identifier |
+| version | integer | Yes | Version number to retrieve |
+
+**Response:** `200 OK`
+
+```json
+{
+  "id": "version-uuid-1",
+  "prompt_id": "prompt-uuid",
+  "version": 1,
+  "title": "Original Title",
+  "content": "Original content",
+  "description": "Original description",
+  "collection_id": null,
+  "tags": ["python"],
+  "created_at": "2024-01-15T10:00:00Z",
+  "created_by": null
+}
+```
+
+**Error Responses:**
+
+- `404 Not Found` - Prompt or version does not exist
+
+**Example Request:**
+
+```bash
+curl "http://localhost:8000/prompts/550e8400-e29b-41d4-a716-446655440000/versions/1"
+```
+
+---
+
+### Revert to Version
+
+Revert a prompt to a previous version. This creates a new version with the content from the specified version, preserving all history.
+
+**Endpoint:** `POST /prompts/{prompt_id}/versions/{version}/revert`
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| prompt_id | string | Yes | Unique prompt identifier |
+| version | integer | Yes | Version number to revert to |
+
+**Response:** `200 OK`
+
+Returns the updated prompt with a new version number.
+
+```json
+{
+  "id": "prompt-uuid",
+  "title": "Original Title",
+  "content": "Original content",
+  "description": "Original description",
+  "collection_id": null,
+  "tags": ["python"],
+  "version": 3,
+  "version_count": 3,
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-15T12:00:00Z"
+}
+```
+
+**Error Responses:**
+
+- `404 Not Found` - Prompt or version does not exist
+- `400 Bad Request` - Trying to revert to current version
+
+**Example Request:**
+
+```bash
+curl -X POST "http://localhost:8000/prompts/550e8400-e29b-41d4-a716-446655440000/versions/1/revert"
+```
+
+**Notes:**
+
+- Reverting to version N creates a new version (N+1) with version N's content
+- No history is deleted - all versions are preserved
+- Cannot revert to the current version
+- Tags and collection are also restored from the target version
+
+---
+
+### Compare Versions
+
+Compare two versions of a prompt to see what changed.
+
+**Endpoint:** `GET /prompts/{prompt_id}/versions/compare`
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| prompt_id | string | Yes | Unique prompt identifier |
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| from | integer | Yes | First version number |
+| to | integer | Yes | Second version number |
+
+**Response:** `200 OK`
+
+```json
+{
+  "prompt_id": "prompt-uuid",
+  "from_version": {
+    "id": "version-uuid-1",
+    "prompt_id": "prompt-uuid",
+    "version": 1,
+    "title": "Original Title",
+    "content": "Original content",
+    "description": "Original description",
+    "collection_id": null,
+    "tags": ["python"],
+    "created_at": "2024-01-15T10:00:00Z",
+    "created_by": null
+  },
+  "to_version": {
+    "id": "version-uuid-2",
+    "prompt_id": "prompt-uuid",
+    "version": 2,
+    "title": "Updated Title",
+    "content": "Updated content",
+    "description": "Original description",
+    "collection_id": "collection-uuid",
+    "tags": ["python", "updated"],
+    "created_at": "2024-01-15T11:00:00Z",
+    "created_by": null
+  },
+  "changes": {
+    "title": "changed",
+    "content": "changed",
+    "description": "unchanged",
+    "collection_id": "changed",
+    "tags": "changed"
+  }
+}
+```
+
+**Error Responses:**
+
+- `404 Not Found` - Prompt or either version does not exist
+
+**Example Request:**
+
+```bash
+curl "http://localhost:8000/prompts/550e8400-e29b-41d4-a716-446655440000/versions/compare?from=1&to=2"
+```
+
+**Notes:**
+
+- The `changes` object shows which fields changed between versions
+- Values are either "changed" or "unchanged"
+- Useful for understanding what was modified in an update
+
+---
+
 ## Data Models
 
 ### Prompt Model
@@ -732,6 +977,8 @@ curl "http://localhost:8000/tags/popular?limit=5"
   "description": "string | null (max 500 chars)",
   "collection_id": "string | null (UUID)",
   "tags": "array of strings (max 10, each 1-30 chars, lowercase alphanumeric and hyphens)",
+  "version": "integer (current version number, starts at 1)",
+  "version_count": "integer (total number of versions)",
   "created_at": "string (ISO 8601 datetime)",
   "updated_at": "string (ISO 8601 datetime)"
 }
@@ -744,6 +991,29 @@ curl "http://localhost:8000/tags/popular?limit=5"
 - Each tag must be 1-30 characters
 - Maximum 10 tags per prompt
 - Duplicate tags are automatically removed
+
+**Version Tracking:**
+- `version`: Current version number (increments with each update)
+- `version_count`: Total number of versions created
+- Every PUT/PATCH operation creates a new version
+- Initial creation starts at version 1
+
+### PromptVersion Model
+
+```json
+{
+  "id": "string (UUID)",
+  "prompt_id": "string (UUID)",
+  "version": "integer (version number, must be positive)",
+  "title": "string (1-200 chars)",
+  "content": "string (min 1 char)",
+  "description": "string | null (max 500 chars)",
+  "collection_id": "string | null (UUID)",
+  "tags": "array of strings (max 10, each 1-30 chars)",
+  "created_at": "string (ISO 8601 datetime)",
+  "created_by": "string | null (future: user who created this version)"
+}
+```
 
 ### Tag Model
 
@@ -842,8 +1112,14 @@ curl http://localhost:8000/prompts
 - CRUD operations for collections
 - Tagging system with tag management
 - Tag filtering with AND logic
+- Automatic version tracking for all prompts
+- Version history with pagination
+- Version comparison
+- Version revert functionality
 - Search and filter functionality
 - Partial update support (PATCH)
+- Comprehensive test coverage (99%, 220 tests)
+- CI/CD pipeline with GitHub Actions
 
 ---
 

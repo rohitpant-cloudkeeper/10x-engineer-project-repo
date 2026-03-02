@@ -30,11 +30,12 @@ Working with AI models means crafting, testing, and iterating on prompts. Prompt
 - 📝 **Template Variables**: Store prompts with placeholders (`{{input}}`, `{{context}}`) for dynamic content
 - 📁 **Collections**: Organize prompts by project, use case, or team
 - 🏷️ **Tagging System**: Add multiple tags to prompts for flexible categorization and filtering
+- 📜 **Version Tracking**: Automatic version history for all prompt changes with compare and revert capabilities
 - 🔍 **Smart Search**: Find prompts by title, description, collection, or tags
 - ⚡ **Fast & Lightweight**: In-memory storage with extensibility to databases
 - 🔄 **Flexible Updates**: Full (PUT) or partial (PATCH) updates supported
 - 📚 **Interactive Docs**: Auto-generated API documentation with Swagger UI
-- ✅ **Production Ready**: Comprehensive test coverage and error handling
+- ✅ **Production Ready**: Comprehensive test coverage (99%) and CI/CD pipeline
 - 🚀 **Easy Integration**: RESTful API works with any language or framework
 
 ### Use Cases
@@ -154,6 +155,15 @@ Returns API health status and version.
 | GET | `/tags` | List all tags (supports search) |
 | GET | `/tags/{name}` | Get a specific tag by name |
 | GET | `/tags/popular` | Get popular tags sorted by usage |
+
+### Version History
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/prompts/{id}/versions` | List all versions of a prompt |
+| GET | `/prompts/{id}/versions/{version}` | Get a specific version |
+| POST | `/prompts/{id}/versions/{version}/revert` | Revert to a previous version |
+| GET | `/prompts/{id}/versions/compare` | Compare two versions |
 
 ### Example Usage
 
@@ -298,6 +308,166 @@ GET /tags?search=python
 
 ---
 
+## Version Tracking
+
+PromptLab automatically tracks the complete history of every prompt, allowing you to view past versions, compare changes, and revert to previous states.
+
+### Version Features
+
+- **Automatic Versioning**: Every prompt update (PUT/PATCH) creates a new version
+- **Complete History**: View all versions of a prompt sorted by version number
+- **Version Comparison**: Compare any two versions to see what changed
+- **Easy Revert**: Restore a prompt to any previous version
+- **Pagination Support**: Efficiently browse through version history
+- **No Data Loss**: Reverting creates a new version, preserving all history
+
+### How Versioning Works
+
+1. **Initial Version**: When you create a prompt, version 1 is automatically created
+2. **Auto-Increment**: Each update (PUT/PATCH) increments the version number
+3. **Full Snapshot**: Each version stores the complete prompt state (title, content, description, tags, collection)
+4. **Revert Creates New Version**: Reverting to v2 doesn't delete v3+, it creates a new version with v2's content
+
+### Version Examples
+
+```bash
+# Create a prompt (creates version 1)
+POST /prompts
+{
+  "title": "Original Title",
+  "content": "Original content"
+}
+
+# Update the prompt (creates version 2)
+PUT /prompts/{id}
+{
+  "title": "Updated Title",
+  "content": "Updated content"
+}
+
+# List all versions
+GET /prompts/{id}/versions
+# Returns: [v2, v1] (newest first)
+
+# Get specific version
+GET /prompts/{id}/versions/1
+# Returns: Original version with "Original Title"
+
+# Compare versions
+GET /prompts/{id}/versions/compare?from=1&to=2
+# Returns: Both versions + changes summary
+
+# Revert to version 1 (creates version 3 with v1 content)
+POST /prompts/{id}/versions/1/revert
+# Result: v3 with "Original Title" and "Original content"
+```
+
+### Version API Endpoints
+
+```bash
+# List all versions (with pagination)
+curl "http://localhost:8000/prompts/{id}/versions?limit=10&offset=0"
+
+# Get a specific version
+curl "http://localhost:8000/prompts/{id}/versions/2"
+
+# Compare two versions
+curl "http://localhost:8000/prompts/{id}/versions/compare?from=1&to=3"
+
+# Revert to a previous version
+curl -X POST "http://localhost:8000/prompts/{id}/versions/2/revert"
+```
+
+### Version Response Format
+
+```json
+{
+  "versions": [
+    {
+      "id": "version-uuid",
+      "prompt_id": "prompt-uuid",
+      "version": 2,
+      "title": "Updated Title",
+      "content": "Updated content",
+      "description": "Updated description",
+      "collection_id": "collection-uuid",
+      "tags": ["python", "updated"],
+      "created_at": "2024-01-15T11:00:00Z"
+    },
+    {
+      "id": "version-uuid",
+      "prompt_id": "prompt-uuid",
+      "version": 1,
+      "title": "Original Title",
+      "content": "Original content",
+      "description": "Original description",
+      "collection_id": null,
+      "tags": ["python"],
+      "created_at": "2024-01-15T10:00:00Z"
+    }
+  ],
+  "total": 2,
+  "prompt_id": "prompt-uuid"
+}
+```
+
+### Version Comparison
+
+The compare endpoint shows which fields changed between versions:
+
+```json
+{
+  "prompt_id": "prompt-uuid",
+  "from_version": { /* version 1 data */ },
+  "to_version": { /* version 2 data */ },
+  "changes": {
+    "title": "changed",
+    "content": "changed",
+    "description": "unchanged",
+    "collection_id": "changed",
+    "tags": "changed"
+  }
+}
+```
+
+---
+
+## CI/CD Pipeline
+
+PromptLab includes a comprehensive CI/CD pipeline using GitHub Actions that automatically runs on every push and pull request.
+
+### Pipeline Features
+
+- ✅ **Automated Testing**: Runs all 220 tests on Python 3.11 and 3.12
+- ✅ **Coverage Enforcement**: Fails if coverage drops below 80% (current: 99%)
+- ✅ **Code Quality**: Runs flake8, black, and isort checks
+- ✅ **Mutation Testing**: Verifies test quality with mutation testing
+- ✅ **Multi-Python**: Tests on multiple Python versions for compatibility
+- ✅ **Artifacts**: Uploads coverage reports for review
+
+### Pipeline Status
+
+Check the current pipeline status with the badges at the top of this README or visit:
+https://github.com/rohitpant-cloudkeeper/10x-engineer-project-repo/actions
+
+### Running CI Locally
+
+```bash
+# Run tests with coverage
+pytest tests/ --cov=app --cov-report=term-missing --cov-fail-under=80 -v
+
+# Run mutation tests
+python test_mutations_tags.py
+python test_mutations_versions.py
+
+# Run code quality checks
+flake8 app/ tests/
+black --check app/ tests/
+isort --check-only app/ tests/
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -396,7 +566,12 @@ We follow conventional commits:
 
 - [x] Week 1: Backend Foundation (Bug fixes, PATCH endpoint)
 - [x] Week 2: Documentation & Specifications
-- [x] Week 3: Testing & Tagging System (Comprehensive tests, TDD, Tagging feature)
+- [x] Week 3: Testing, Tagging & Version Tracking
+  - [x] Comprehensive unit tests (220 tests, 99% coverage)
+  - [x] Tagging system with filtering
+  - [x] Version tracking with history and revert
+  - [x] Mutation testing (100% kill rate for versions, 90.9% for tags)
+  - [x] CI/CD pipeline with GitHub Actions
 - [ ] Week 4: Full-Stack Integration (React frontend)
 
 ---
