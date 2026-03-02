@@ -1,5 +1,5 @@
 services:
-  # Backend API service
+  # Backend API service (development)
   backend:
     build:
       context: ./backend
@@ -25,6 +25,31 @@ services:
     networks:
       - promptlab-network
 
+  # Frontend service (development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: promptlab-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+      - ./frontend/index.html:/app/index.html:ro
+      - ./frontend/vite.config.js:/app/vite.config.js:ro
+      # Prevent node_modules from being overwritten
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - promptlab-network
+
   # Backend for production (without reload)
   backend-prod:
     build:
@@ -42,6 +67,30 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+    restart: unless-stopped
+    networks:
+      - promptlab-network
+    profiles:
+      - production
+
+  # Frontend for production
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: promptlab-frontend-prod
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      - backend-prod
     restart: unless-stopped
     networks:
       - promptlab-network

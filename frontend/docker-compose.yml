@@ -1,0 +1,48 @@
+services:
+  # Frontend development service
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: promptlab-frontend-dev
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      # Mount source code for hot reload
+      - ./src:/app/src:ro
+      - ./public:/app/public:ro
+      - ./index.html:/app/index.html:ro
+      - ./vite.config.js:/app/vite.config.js:ro
+      # Prevent node_modules from being overwritten
+      - /app/node_modules
+    restart: unless-stopped
+    networks:
+      - promptlab-network
+
+  # Frontend production service
+  frontend-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: promptlab-frontend-prod
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - promptlab-network
+    profiles:
+      - production
+
+networks:
+  promptlab-network:
+    driver: bridge
