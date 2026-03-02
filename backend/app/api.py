@@ -82,6 +82,36 @@ def create_prompt_version(prompt: Prompt) -> PromptVersion:
         tags=prompt.tags.copy() if prompt.tags else []
     )
     return storage.create_version(version)
+def _handle_tag_updates(old_tags: list[str], new_tags: list[str]) -> list[str]:
+    """Handle tag updates by managing usage counts.
+
+    Decrements usage count for removed tags and increments for new tags.
+    Returns the normalized list of new tags.
+
+    Args:
+        old_tags: List of existing tags on the prompt.
+        new_tags: List of new tags to apply (will be normalized).
+
+    Returns:
+        list[str]: Normalized and deduplicated list of new tags.
+
+    Examples:
+        >>> normalized = _handle_tag_updates(["old-tag"], ["new-tag", "python"])
+        >>> # old-tag usage decremented, new-tag and python usage incremented
+    """
+    # Normalize and deduplicate new tags
+    normalized_tags = normalize_tags(new_tags)
+
+    # Remove old tags (decrement usage)
+    for tag in old_tags:
+        storage.update_tag_usage(tag, -1)
+
+    # Add new tags (increment usage)
+    for tag in normalized_tags:
+        storage.create_or_update_tag(tag)
+
+    return normalized_tags
+
 
 
 # ============== Prompt Endpoints ==============
@@ -251,31 +281,21 @@ def update_prompt(prompt_id: str, prompt_data: PromptUpdate):
         if not collection:
             raise HTTPException(status_code=400, detail="Collection not found")
     
+    # Handle tag updates
+    normalized_tags = _handle_tag_updates(existing.tags, prompt_data.tags)
+    
     updated_prompt = Prompt(
         id=existing.id,
         title=prompt_data.title,
         content=prompt_data.content,
         description=prompt_data.description,
         collection_id=prompt_data.collection_id,
+        tags=normalized_tags,
+        version=existing.version + 1,
+        version_count=existing.version_count + 1,
         created_at=existing.created_at,
         updated_at=get_current_time()
     )
-    
-    # Normalize and deduplicate tags
-    normalized_tags = normalize_tags(prompt_data.tags)
-    updated_prompt.tags = normalized_tags
-    
-    # Update tag usage counts
-    # Remove old tags
-    for tag in existing.tags:
-        storage.update_tag_usage(tag, -1)
-    # Add new tags
-    for tag in normalized_tags:
-        storage.create_or_update_tag(tag)
-    
-    # Increment version
-    updated_prompt.version = existing.version + 1
-    updated_prompt.version_count = existing.version_count + 1
     
     # Save updated prompt
     result = storage.update_prompt(prompt_id, updated_prompt)
@@ -327,16 +347,8 @@ def patch_prompt(prompt_id: str, prompt_data: PromptPatch):
     
     # Handle tags if provided
     if 'tags' in update_data:
-        normalized_tags = normalize_tags(update_data['tags'])
+        normalized_tags = _handle_tag_updates(existing.tags, update_data['tags'])
         update_data['tags'] = normalized_tags
-        
-        # Update tag usage counts
-        # Remove old tags
-        for tag in existing.tags:
-            storage.update_tag_usage(tag, -1)
-        # Add new tags
-        for tag in normalized_tags:
-            storage.create_or_update_tag(tag)
     
     updated_prompt = Prompt(
         id=existing.id,
