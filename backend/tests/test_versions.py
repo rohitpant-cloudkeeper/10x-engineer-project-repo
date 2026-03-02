@@ -584,3 +584,163 @@ class TestVersionPagination:
         data = response.json()
         assert len(data["versions"]) == 3  # 5 total - 2 offset
         assert data["versions"][0]["version"] == 3  # Skipped 5 and 4
+
+
+
+class TestVersionFieldsUpdated:
+    """Tests to verify version fields are properly updated."""
+    
+    def test_update_increments_version_field(self, client: TestClient):
+        """Test that PUT updates increment the version field."""
+        # Create prompt
+        response = client.post("/prompts", json={
+            "title": "V1",
+            "content": "Content"
+        })
+        prompt_id = response.json()["id"]
+        assert response.json()["version"] == 1
+        
+        # Update prompt
+        response = client.put(f"/prompts/{prompt_id}", json={
+            "title": "V2",
+            "content": "Content"
+        })
+        assert response.status_code == 200
+        assert response.json()["version"] == 2
+        
+        # Update again
+        response = client.put(f"/prompts/{prompt_id}", json={
+            "title": "V3",
+            "content": "Content"
+        })
+        assert response.status_code == 200
+        assert response.json()["version"] == 3
+    
+    def test_patch_increments_version_field(self, client: TestClient):
+        """Test that PATCH updates increment the version field."""
+        # Create prompt
+        response = client.post("/prompts", json={
+            "title": "V1",
+            "content": "Content"
+        })
+        prompt_id = response.json()["id"]
+        assert response.json()["version"] == 1
+        
+        # Patch prompt
+        response = client.patch(f"/prompts/{prompt_id}", json={
+            "title": "V2"
+        })
+        assert response.status_code == 200
+        assert response.json()["version"] == 2
+    
+    def test_update_increments_version_count_field(self, client: TestClient):
+        """Test that PUT updates increment the version_count field."""
+        # Create prompt
+        response = client.post("/prompts", json={
+            "title": "V1",
+            "content": "Content"
+        })
+        prompt_id = response.json()["id"]
+        assert response.json()["version_count"] == 1
+        
+        # Update prompt
+        response = client.put(f"/prompts/{prompt_id}", json={
+            "title": "V2",
+            "content": "Content"
+        })
+        assert response.status_code == 200
+        assert response.json()["version_count"] == 2
+        
+        # Update again
+        response = client.put(f"/prompts/{prompt_id}", json={
+            "title": "V3",
+            "content": "Content"
+        })
+        assert response.status_code == 200
+        assert response.json()["version_count"] == 3
+    
+    def test_patch_increments_version_count_field(self, client: TestClient):
+        """Test that PATCH updates increment the version_count field."""
+        # Create prompt
+        response = client.post("/prompts", json={
+            "title": "V1",
+            "content": "Content"
+        })
+        prompt_id = response.json()["id"]
+        assert response.json()["version_count"] == 1
+        
+        # Patch prompt
+        response = client.patch(f"/prompts/{prompt_id}", json={
+            "title": "V2"
+        })
+        assert response.status_code == 200
+        assert response.json()["version_count"] == 2
+    
+    def test_revert_increments_version_field(self, client: TestClient):
+        """Test that revert increments the version field."""
+        # Create and update prompt
+        response = client.post("/prompts", json={
+            "title": "V1",
+            "content": "Content"
+        })
+        prompt_id = response.json()["id"]
+        
+        client.put(f"/prompts/{prompt_id}", json={
+            "title": "V2",
+            "content": "Content"
+        })
+        
+        # Revert to V1
+        response = client.post(f"/prompts/{prompt_id}/versions/1/revert")
+        assert response.status_code == 200
+        assert response.json()["version"] == 3  # Should be 3, not 1
+    
+    def test_revert_increments_version_count_field(self, client: TestClient):
+        """Test that revert increments the version_count field."""
+        # Create and update prompt
+        response = client.post("/prompts", json={
+            "title": "V1",
+            "content": "Content"
+        })
+        prompt_id = response.json()["id"]
+        
+        client.put(f"/prompts/{prompt_id}", json={
+            "title": "V2",
+            "content": "Content"
+        })
+        
+        # Revert to V1
+        response = client.post(f"/prompts/{prompt_id}/versions/1/revert")
+        assert response.status_code == 200
+        assert response.json()["version_count"] == 3  # Should be 3, not 1
+
+
+class TestVersionCascadeDeleteVerification:
+    """Tests to verify versions are actually deleted."""
+    
+    def test_versions_actually_deleted_on_prompt_delete(self, client: TestClient):
+        """Test that versions are actually removed from storage when prompt deleted."""
+        from app.storage import storage
+        
+        # Create and update prompt
+        response = client.post("/prompts", json={
+            "title": "Test",
+            "content": "Content"
+        })
+        prompt_id = response.json()["id"]
+        
+        client.put(f"/prompts/{prompt_id}", json={
+            "title": "Updated",
+            "content": "Content"
+        })
+        
+        # Verify versions exist in storage
+        versions_before = storage.get_versions(prompt_id)
+        assert len(versions_before) == 2
+        
+        # Delete prompt
+        client.delete(f"/prompts/{prompt_id}")
+        
+        # Verify versions are gone from storage
+        versions_after = storage.get_versions(prompt_id)
+        assert len(versions_after) == 0
