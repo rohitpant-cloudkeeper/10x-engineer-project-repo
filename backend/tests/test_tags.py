@@ -168,6 +168,20 @@ class TestTagNormalization:
         with pytest.raises(ValueError, match="Tag length must be 1-30 characters"):
             normalize_tag("a" * 31)
     
+    def test_normalize_tag_rejects_uppercase_after_normalization(self):
+        """Test that uppercase letters are converted, not just validated."""
+        from app.utils import normalize_tag
+        
+        # After normalization, should be lowercase
+        result = normalize_tag("PYTHON")
+        assert result == "python"
+        assert result.islower()
+        
+        # Mixed case should also be lowercase
+        result = normalize_tag("PyThOn")
+        assert result == "python"
+        assert result.islower()
+    
     def test_normalize_tags_list(self):
         """Test normalizing a list of tags."""
         from app.utils import normalize_tags
@@ -564,3 +578,94 @@ class TestTagAPI:
         data = response.json()
         assert data["total"] == 1
         assert data["prompts"][0]["title"] == "Python Code Review"
+    
+    def test_delete_prompt_decrements_tag_usage(self, client: TestClient):
+        """Test that deleting a prompt decrements tag usage counts."""
+        # Create prompt with tags
+        response = client.post("/prompts", json={
+            "title": "Test Prompt",
+            "content": "Content",
+            "tags": ["python", "testing"]
+        })
+        prompt_id = response.json()["id"]
+        
+        # Verify tags exist with usage count 1
+        python_tag = client.get("/tags/python").json()
+        testing_tag = client.get("/tags/testing").json()
+        assert python_tag["usage_count"] == 1
+        assert testing_tag["usage_count"] == 1
+        
+        # Delete the prompt
+        client.delete(f"/prompts/{prompt_id}")
+        
+        # Verify tags are deleted (usage count 0)
+        python_response = client.get("/tags/python")
+        testing_response = client.get("/tags/testing")
+        assert python_response.status_code == 404
+        assert testing_response.status_code == 404
+    
+    def test_update_prompt_updates_tag_usage_counts(self, client: TestClient):
+        """Test that updating prompt tags updates usage counts correctly."""
+        # Create prompt with initial tags
+        response = client.post("/prompts", json={
+            "title": "Test Prompt",
+            "content": "Content",
+            "tags": ["python", "testing"]
+        })
+        prompt_id = response.json()["id"]
+        
+        # Verify initial tag usage
+        python_tag = client.get("/tags/python").json()
+        testing_tag = client.get("/tags/testing").json()
+        assert python_tag["usage_count"] == 1
+        assert testing_tag["usage_count"] == 1
+        
+        # Update prompt with different tags (remove "testing", add "advanced")
+        client.put(f"/prompts/{prompt_id}", json={
+            "title": "Test Prompt",
+            "content": "Content",
+            "tags": ["python", "advanced"]
+        })
+        
+        # Verify tag usage counts updated
+        python_tag = client.get("/tags/python").json()
+        assert python_tag["usage_count"] == 1  # Still 1
+        
+        testing_response = client.get("/tags/testing")
+        assert testing_response.status_code == 404  # Should be deleted
+        
+        advanced_tag = client.get("/tags/advanced").json()
+        assert advanced_tag["usage_count"] == 1  # New tag
+    
+    def test_patch_prompt_updates_tag_usage_counts(self, client: TestClient):
+        """Test that patching prompt tags updates usage counts correctly."""
+        # Create prompt with initial tags
+        response = client.post("/prompts", json={
+            "title": "Test Prompt",
+            "content": "Content",
+            "tags": ["python", "testing"]
+        })
+        prompt_id = response.json()["id"]
+        
+        # Verify initial tag usage
+        python_tag = client.get("/tags/python").json()
+        testing_tag = client.get("/tags/testing").json()
+        assert python_tag["usage_count"] == 1
+        assert testing_tag["usage_count"] == 1
+        
+        # Patch prompt with different tags
+        client.patch(f"/prompts/{prompt_id}", json={
+            "tags": ["javascript", "advanced"]
+        })
+        
+        # Verify old tags removed
+        python_response = client.get("/tags/python")
+        testing_response = client.get("/tags/testing")
+        assert python_response.status_code == 404
+        assert testing_response.status_code == 404
+        
+        # Verify new tags added
+        javascript_tag = client.get("/tags/javascript").json()
+        advanced_tag = client.get("/tags/advanced").json()
+        assert javascript_tag["usage_count"] == 1
+        assert advanced_tag["usage_count"] == 1
