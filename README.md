@@ -2,67 +2,180 @@
 
 **Your AI Prompt Engineering Platform**
 
+A professional tool for AI engineers to store, organize, and manage prompt templates. Think of it as "Postman for Prompts" - a workspace where teams can collaborate on AI prompts.
+
 ---
 
-## Welcome to the Team! 👋
+## Overview
 
-Congratulations on joining the PromptLab engineering team! You've been brought on to help us build the next generation of prompt engineering tools.
+PromptLab is a REST API platform designed to solve a common problem in AI development: managing and organizing prompt templates. As AI applications grow, teams often struggle with scattered prompts across files, notebooks, and chat histories. PromptLab provides a centralized, version-controlled system for prompt management.
 
-### What is PromptLab?
+### Why PromptLab?
 
-PromptLab is an internal tool for AI engineers to **store, organize, and manage their prompts**. Think of it as a "Postman for Prompts" — a professional workspace where teams can:
+Working with AI models means crafting, testing, and iterating on prompts. PromptLab helps you:
 
-- 📝 Store prompt templates with variables (`{{input}}`, `{{context}}`)
-- 📁 Organize prompts into collections
-- 🏷️ Tag and search prompts
-- 📜 Track version history
-- 🧪 Test prompts with sample inputs
+- **Centralize**: Keep all your prompts in one place instead of scattered across files
+- **Collaborate**: Share prompts with your team through collections
+- **Reuse**: Store templates with variables like `{{user_input}}` for dynamic content
+- **Discover**: Search and filter prompts to find what you need quickly
+- **Iterate**: Update prompts without losing track of what works
 
-### The Current Situation
+### Key Features
 
-The previous developer left us with a *partially working* backend. The core structure is there, but:
+- 📝 **Template Variables**: Store prompts with placeholders (`{{input}}`, `{{context}}`) for dynamic content
+- 📁 **Collections**: Organize prompts by project, use case, or team
+- 🔍 **Smart Search**: Find prompts by title, description, or collection
+- ⚡ **Fast & Lightweight**: In-memory storage with extensibility to databases
+- 🔄 **Flexible Updates**: Full (PUT) or partial (PATCH) updates supported
+- 📚 **Interactive Docs**: Auto-generated API documentation with Swagger UI
+- ✅ **Production Ready**: Comprehensive test coverage and error handling
+- 🚀 **Easy Integration**: RESTful API works with any language or framework
 
-- There are **several bugs** that need fixing
-- Some **features are incomplete**
-- The **documentation is minimal** (you'll fix that)
-- There are **no tests** worth mentioning
-- **No CI/CD pipeline** exists
-- **No frontend** has been built yet
+### Use Cases
 
-Your job over the next 4 weeks is to transform this into a **production-ready, full-stack application**.
+- **AI Application Development**: Store and manage prompts for your LLM-powered apps
+- **Prompt Engineering Teams**: Collaborate on prompt templates across projects
+- **Research & Experimentation**: Keep track of different prompt variations
+- **Production Systems**: Centralized prompt management for deployed AI services
+
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- Python 3.10 or higher
+- pip (Python package manager)
+- Git
+- Virtual environment tool (venv)
+
+---
+
+## Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/rohitpant-cloudkeeper/10x-engineer-project-repo.git
+cd 10x-engineer-project-repo
+```
+
+### 2. Set Up Backend
+
+```bash
+cd backend
+
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+# On macOS/Linux:
+source venv/bin/activate
+# On Windows:
+# venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
 
 ---
 
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.10+
-- Node.js 18+ (for Week 4)
-- Git
-
-### Run Locally
+### Running the Server
 
 ```bash
-# Clone the repo
-git clone <your-repo-url>
-cd promptlab
-
-# Set up backend
 cd backend
-pip install -r requirements.txt
-python main.py
+source venv/bin/activate
+uvicorn app.api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-API runs at: http://localhost:8000
+The API will be available at:
+- API Base: http://localhost:8000
+- Interactive Docs: http://localhost:8000/docs
+- Alternative Docs: http://localhost:8000/redoc
 
-API docs at: http://localhost:8000/docs
-
-### Run Tests
+### Running Tests
 
 ```bash
 cd backend
+source venv/bin/activate
 pytest tests/ -v
+```
+
+### Running Tests with Coverage
+
+```bash
+pytest tests/ -v --cov=app --cov-report=term-missing
+```
+
+---
+
+## API Endpoints
+
+### Health Check
+
+```http
+GET /health
+```
+
+Returns API health status and version.
+
+### Prompts
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/prompts` | List all prompts (supports filtering and search) |
+| GET | `/prompts/{id}` | Get a specific prompt by ID |
+| POST | `/prompts` | Create a new prompt |
+| PUT | `/prompts/{id}` | Update a prompt (full update) |
+| PATCH | `/prompts/{id}` | Partially update a prompt |
+| DELETE | `/prompts/{id}` | Delete a prompt |
+
+### Collections
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/collections` | List all collections |
+| GET | `/collections/{id}` | Get a specific collection by ID |
+| POST | `/collections` | Create a new collection |
+| DELETE | `/collections/{id}` | Delete a collection |
+
+### Example Usage
+
+#### Create a Prompt
+
+```bash
+curl -X POST "http://localhost:8000/prompts" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Code Review Prompt",
+    "content": "Review the following code and provide feedback:\n\n{{code}}",
+    "description": "A prompt for AI code review"
+  }'
+```
+
+#### List Prompts with Filtering
+
+```bash
+# Get all prompts
+curl "http://localhost:8000/prompts"
+
+# Filter by collection
+curl "http://localhost:8000/prompts?collection_id=abc123"
+
+# Search prompts
+curl "http://localhost:8000/prompts?search=code"
+```
+
+#### Partial Update with PATCH
+
+```bash
+curl -X PATCH "http://localhost:8000/prompts/{id}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Updated Title"
+  }'
 ```
 
 ---
@@ -71,97 +184,119 @@ pytest tests/ -v
 
 ```
 promptlab/
-├── README.md                    # You are here
-├── PROJECT_BRIEF.md             # Your assignment details
-├── GRADING_RUBRIC.md            # How you'll be graded
+├── README.md                    # This file
+├── PROJECT_BRIEF.md             # Assignment details
+├── GRADING_RUBRIC.md            # Grading criteria
 │
 ├── backend/
 │   ├── app/
-│   │   ├── __init__.py
-│   │   ├── api.py              # FastAPI routes (has bugs!)
-│   │   ├── models.py           # Pydantic models
-│   │   ├── storage.py          # In-memory storage
-│   │   └── utils.py            # Helper functions
+│   │   ├── __init__.py          # Package initialization
+│   │   ├── api.py               # FastAPI routes and endpoints
+│   │   ├── models.py            # Pydantic data models
+│   │   ├── storage.py           # In-memory storage layer
+│   │   └── utils.py             # Helper functions
 │   ├── tests/
 │   │   ├── __init__.py
-│   │   ├── test_api.py         # Basic tests
-│   │   └── conftest.py         # Test fixtures
-│   ├── main.py                 # Entry point
-│   └── requirements.txt
+│   │   ├── conftest.py          # Test fixtures
+│   │   └── test_api.py          # API endpoint tests
+│   ├── main.py                  # Application entry point
+│   ├── requirements.txt         # Python dependencies
+│   └── venv/                    # Virtual environment (not in git)
 │
-├── frontend/                    # You'll create this in Week 4
-├── specs/                       # You'll create this in Week 2
-├── docs/                        # You'll create this in Week 2
-└── .github/                     # You'll set up CI/CD in Week 3
+├── docs/                        # Documentation files
+├── specs/                       # Feature specifications
+├── frontend/                    # Frontend (Week 4)
+└── .github/                     # CI/CD workflows (Week 3)
 ```
 
 ---
 
-## Your Mission
+## Development
 
-### 🧪 Experimentation Encouraged!
-While we provide guidelines, **you are the engineer**. If you see a better way to solve a problem using AI, do it!
-- Want to swap the storage layer for a real database? **Go for it.**
-- Want to add Authentication? **Do it.**
-- Want to rewrite the API in a different style? **As long as tests pass, you're clear.**
+### Setting Up Development Environment
 
-The goal is to learn how to build *better* software *faster* with AI. Don't be afraid to break things and rebuild them better.
+1. Follow the installation steps above
+2. Install development dependencies (if any)
+3. Run tests to ensure everything works
+4. Start the server with hot reload enabled
 
-### Week 1: Fix the Backend
-- Understand this codebase using AI
-- Find and fix the bugs
-- Implement missing features
+### Code Style
 
-### Week 2: Document Everything
-- Write proper documentation
-- Create feature specifications
-- Set up coding standards
+- Follow PEP 8 style guidelines for Python
+- Use type hints for function parameters and return values
+- Write docstrings for all functions and classes (Google style)
+- Keep functions small and focused
+- Write tests for new features
 
-### Week 3: Make it Production-Ready
-- Write comprehensive tests
-- Implement new features with TDD
-- Set up CI/CD and Docker
+### Making Changes
 
-### Week 4: Build the Frontend
-- Create a React frontend
-- Connect it to the backend
-- Polish the user experience
-
----
-
-## API Endpoints (Current)
-
-| Method | Endpoint | Description | Status |
-|--------|----------|-------------|--------|
-| GET | `/health` | Health check | ✅ Works |
-| GET | `/prompts` | List all prompts | ⚠️ Has issues |
-| GET | `/prompts/{id}` | Get single prompt | ❌ Bug |
-| POST | `/prompts` | Create prompt | ✅ Works |
-| PUT | `/prompts/{id}` | Update prompt | ⚠️ Has issues |
-| DELETE | `/prompts/{id}` | Delete prompt | ✅ Works |
-| GET | `/collections` | List collections | ✅ Works |
-| GET | `/collections/{id}` | Get collection | ✅ Works |
-| POST | `/collections` | Create collection | ✅ Works |
-| DELETE | `/collections/{id}` | Delete collection | ❌ Bug |
+1. Create a new branch for your feature
+2. Make your changes
+3. Run tests to ensure nothing breaks
+4. Commit with meaningful messages
+5. Push and create a pull request
 
 ---
 
 ## Tech Stack
 
-- **Backend**: Python 3.10+, FastAPI, Pydantic
-- **Frontend**: React, Vite (Week 4)
-- **Testing**: pytest
-- **DevOps**: Docker, GitHub Actions (Week 3)
+- **Framework**: FastAPI 0.109.0
+- **Server**: Uvicorn 0.27.0
+- **Validation**: Pydantic 2.10+
+- **Testing**: pytest 7.4.4
+- **HTTP Client**: httpx 0.26.0 (for testing)
+- **Coverage**: pytest-cov 4.1.0
 
 ---
 
-## Need Help?
+## Contributing
 
-1. **Use AI tools** — This is an AI-assisted coding course!
-2. Read the `PROJECT_BRIEF.md` for detailed instructions
-3. Check `GRADING_RUBRIC.md` to understand expectations
-4. Ask questions in the course forum
+We welcome contributions! Here's how you can help:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`pytest tests/ -v`)
+5. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+### Commit Message Convention
+
+We follow conventional commits:
+
+- `feat:` New feature
+- `fix:` Bug fix
+- `docs:` Documentation changes
+- `test:` Adding or updating tests
+- `refactor:` Code refactoring
+- `chore:` Maintenance tasks
 
 ---
 
-Good luck, and welcome to the team! 🚀
+## Roadmap
+
+- [x] Week 1: Backend Foundation (Bug fixes, PATCH endpoint)
+- [ ] Week 2: Documentation & Specifications
+- [ ] Week 3: Testing & DevOps (CI/CD, Docker)
+- [ ] Week 4: Full-Stack Integration (React frontend)
+
+---
+
+## License
+
+This project is part of an educational assignment.
+
+---
+
+## Support
+
+For questions or issues:
+- Check the [PROJECT_BRIEF.md](PROJECT_BRIEF.md) for detailed instructions
+- Review [GRADING_RUBRIC.md](GRADING_RUBRIC.md) for requirements
+- Open an issue on GitHub
+- Contact the course instructor
+
+---
+
+**Built with ❤️ as part of the 10x Engineer learning project**
