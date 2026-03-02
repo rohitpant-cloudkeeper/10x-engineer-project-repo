@@ -1,5 +1,10 @@
 # PromptLab
 
+![CI Pipeline](https://github.com/rohitpant-cloudkeeper/10x-engineer-project-repo/workflows/CI%20Pipeline/badge.svg?branch=Week-3)
+![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-220%20passing-brightgreen)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+
 **Your AI Prompt Engineering Platform**
 
 A professional tool for AI engineers to store, organize, and manage prompt templates. Think of it as "Postman for Prompts" - a workspace where teams can collaborate on AI prompts.
