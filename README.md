@@ -69,6 +69,17 @@ cd 10x-engineer-project-repo
 
 ### 2. Set Up Backend
 
+#### Option A: Using Docker (Recommended)
+
+```bash
+# Build and start the services
+docker-compose up -d
+
+# The API will be available at http://localhost:8000
+```
+
+#### Option B: Local Python Environment
+
 ```bash
 cd backend
 
@@ -89,7 +100,30 @@ pip install -r requirements.txt
 
 ## Quick Start
 
-### Running the Server
+### Option 1: Using Docker (Recommended)
+
+Docker provides a consistent environment and is the easiest way to get started.
+
+```bash
+# Start the development server
+docker-compose up
+
+# Or run in detached mode (background)
+docker-compose up -d
+
+# View logs
+docker-compose logs -f backend
+
+# Stop the services
+docker-compose down
+```
+
+The API will be available at:
+- API Base: http://localhost:8000
+- Interactive Docs: http://localhost:8000/docs
+- Alternative Docs: http://localhost:8000/redoc
+
+### Option 2: Local Python Environment
 
 ```bash
 cd backend
@@ -102,7 +136,138 @@ The API will be available at:
 - Interactive Docs: http://localhost:8000/docs
 - Alternative Docs: http://localhost:8000/redoc
 
-### Running Tests
+---
+
+## Docker Usage
+
+### Prerequisites
+
+- Docker Desktop (macOS/Windows) or Docker Engine (Linux)
+- Docker Compose v2.0+
+
+### Docker Commands
+
+#### Development Mode (with hot reload)
+
+```bash
+# Start services
+docker-compose up
+
+# Start in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f backend
+
+# Stop services
+docker-compose down
+
+# Rebuild after code changes
+docker-compose up --build
+```
+
+#### Production Mode
+
+```bash
+# Start production service (runs on port 8001)
+docker-compose --profile production up backend-prod -d
+
+# View production logs
+docker-compose logs -f backend-prod
+
+# Stop production service
+docker-compose --profile production down
+```
+
+#### Running Tests in Docker
+
+```bash
+# Run tests in a temporary container
+docker-compose run --rm backend pytest tests/ -v
+
+# Run tests with coverage
+docker-compose run --rm backend pytest tests/ --cov=app --cov-report=term-missing
+
+# Run specific test file
+docker-compose run --rm backend pytest tests/test_api.py -v
+```
+
+#### Useful Docker Commands
+
+```bash
+# View running containers
+docker-compose ps
+
+# Execute command in running container
+docker-compose exec backend python -c "print('Hello from container')"
+
+# Access container shell
+docker-compose exec backend /bin/bash
+
+# View container logs (last 100 lines)
+docker-compose logs --tail=100 backend
+
+# Remove all containers and volumes
+docker-compose down -v
+
+# Rebuild without cache
+docker-compose build --no-cache
+```
+
+### Docker Architecture
+
+The Docker setup includes:
+
+- **Dockerfile**: Multi-stage build for optimized image size
+- **docker-compose.yml**: Orchestrates services for local development
+- **Health checks**: Automatic health monitoring
+- **Volume mounts**: Hot reload for development
+- **Non-root user**: Security best practice
+- **Network isolation**: Dedicated Docker network
+
+### Troubleshooting Docker
+
+**Container won't start:**
+```bash
+# Check logs
+docker-compose logs backend
+
+# Rebuild image
+docker-compose build --no-cache backend
+docker-compose up
+```
+
+**Port already in use:**
+```bash
+# Change port in docker-compose.yml
+ports:
+  - "8001:8000"  # Use different host port
+```
+
+**Permission issues:**
+```bash
+# Ensure Docker daemon is running
+docker ps
+
+# On Linux, add user to docker group
+sudo usermod -aG docker $USER
+```
+
+---
+
+## Running Tests
+
+### With Docker
+
+```bash
+# Run all tests
+docker-compose run --rm backend pytest tests/ -v
+
+# Run with coverage
+docker-compose run --rm backend pytest tests/ --cov=app --cov-report=term-missing
+```
+
+### Without Docker
 
 ```bash
 cd backend
@@ -475,8 +640,11 @@ promptlab/
 ├── README.md                    # This file
 ├── PROJECT_BRIEF.md             # Assignment details
 ├── GRADING_RUBRIC.md            # Grading criteria
+├── docker-compose.yml           # Docker orchestration
 │
 ├── backend/
+│   ├── Dockerfile               # Docker image definition
+│   ├── .dockerignore            # Docker build exclusions
 │   ├── app/
 │   │   ├── __init__.py          # Package initialization
 │   │   ├── api.py               # FastAPI routes and endpoints
@@ -486,15 +654,24 @@ promptlab/
 │   ├── tests/
 │   │   ├── __init__.py
 │   │   ├── conftest.py          # Test fixtures
-│   │   └── test_api.py          # API endpoint tests
+│   │   ├── test_api.py          # API endpoint tests
+│   │   ├── test_tags.py         # Tag system tests
+│   │   └── test_versions.py    # Version tracking tests
+│   ├── test_mutations_tags.py   # Mutation testing for tags
+│   ├── test_mutations_versions.py # Mutation testing for versions
 │   ├── main.py                  # Application entry point
 │   ├── requirements.txt         # Python dependencies
 │   └── venv/                    # Virtual environment (not in git)
 │
-├── docs/                        # Documentation files
-├── specs/                       # Feature specifications
+├── docs/
+│   └── API_REFERENCE.md         # Complete API documentation
+├── specs/
+│   ├── tagging-system.md        # Tagging feature spec
+│   └── prompt-versions.md       # Version tracking spec
 ├── frontend/                    # Frontend (Week 4)
-└── .github/                     # CI/CD workflows (Week 3)
+└── .github/
+    └── workflows/
+        └── ci.yml               # CI/CD pipeline
 ```
 
 ---
