@@ -51,11 +51,13 @@ class PromptBase(BaseModel):
         content (str): The actual prompt text with optional template variables.
         description (Optional[str]): Optional description of the prompt's purpose (max 500 chars).
         collection_id (Optional[str]): Optional ID linking this prompt to a collection.
+        tags (List[str]): List of tags for categorization (max 10 tags).
     """
     title: str = Field(..., min_length=1, max_length=200, description="Prompt title")
     content: str = Field(..., min_length=1, description="Prompt content with optional {{variables}}")
     description: Optional[str] = Field(None, max_length=500, description="Optional prompt description")
     collection_id: Optional[str] = Field(None, description="ID of the collection this prompt belongs to")
+    tags: List[str] = Field(default_factory=list, max_items=10, description="Tags for categorization")
 
 
 class PromptCreate(PromptBase):
@@ -102,10 +104,16 @@ class PromptPatch(BaseModel):
         content (Optional[str]): Optional new content (min 1 character if provided).
         description (Optional[str]): Optional new description (max 500 chars if provided).
         collection_id (Optional[str]): Optional new collection ID.
+        tags (Optional[List[str]]): Optional new tags list (max 10 tags if provided).
         
     Examples:
         >>> patch_data = PromptPatch(title="New Title Only")
     """
+    title: Optional[str] = Field(None, min_length=1, max_length=200, description="Optional new title")
+    content: Optional[str] = Field(None, min_length=1, description="Optional new content")
+    description: Optional[str] = Field(None, max_length=500, description="Optional new description")
+    collection_id: Optional[str] = Field(None, description="Optional new collection ID")
+    tags: Optional[List[str]] = Field(None, max_items=10, description="Optional new tags")
     title: Optional[str] = Field(None, min_length=1, max_length=200, description="Optional new title")
     content: Optional[str] = Field(None, min_length=1, description="Optional new content")
     description: Optional[str] = Field(None, max_length=500, description="Optional new description")
@@ -137,6 +145,44 @@ class Prompt(PromptBase):
 
     class Config:
         from_attributes = True
+
+
+# ============== Tag Models ==============
+
+class Tag(BaseModel):
+    """A tag for categorizing prompts.
+    
+    Tags provide a flexible way to categorize prompts with multiple labels.
+    Each tag tracks its usage count across all prompts.
+    
+    Attributes:
+        name (str): Tag name (lowercase, alphanumeric and hyphens only, 1-30 chars).
+        usage_count (int): Number of prompts using this tag.
+        created_at (datetime): When tag was first used.
+        
+    Examples:
+        >>> tag = Tag(name="python", usage_count=5)
+        >>> assert tag.name == "python"
+    """
+    name: str = Field(..., min_length=1, max_length=30, pattern="^[a-z0-9-]+$", description="Tag name")
+    usage_count: int = Field(default=0, ge=0, description="Number of prompts using this tag")
+    created_at: datetime = Field(default_factory=get_current_time, description="Creation timestamp")
+
+
+class TagList(BaseModel):
+    """Response model for listing tags.
+    
+    Used by GET /tags endpoint to return multiple tags with metadata.
+    
+    Attributes:
+        tags (List[Tag]): List of tag objects.
+        total (int): Total count of tags returned.
+        
+    Examples:
+        >>> response = TagList(tags=[tag1, tag2], total=2)
+    """
+    tags: List[Tag] = Field(..., description="List of tags")
+    total: int = Field(..., description="Total number of tags")
 
 
 # ============== Collection Models ==============

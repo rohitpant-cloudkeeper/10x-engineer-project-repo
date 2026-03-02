@@ -3,7 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.api import app
-from app.storage import storage
+from app.storage import storage as global_storage, Storage
 
 
 @pytest.fixture
@@ -12,12 +12,18 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture
+def storage():
+    """Create a fresh storage instance for each test."""
+    return Storage()
+
+
 @pytest.fixture(autouse=True)
 def clear_storage():
-    """Clear storage before each test."""
-    storage.clear()
+    """Clear global storage before each test."""
+    global_storage.clear()
     yield
-    storage.clear()
+    global_storage.clear()
 
 
 @pytest.fixture

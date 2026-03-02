@@ -11,19 +11,20 @@ Note:
 """
 
 from typing import Dict, List, Optional
-from app.models import Prompt, Collection
+from app.models import Prompt, Collection, Tag
 
 
 class Storage:
-    """In-memory storage manager for prompts and collections.
+    """In-memory storage manager for prompts, collections, and tags.
     
-    Provides CRUD operations for prompts and collections using Python
+    Provides CRUD operations for prompts, collections, and tags using Python
     dictionaries as the underlying storage mechanism. Thread-safe for
     single-threaded applications but not suitable for concurrent access.
     
     Attributes:
         _prompts (Dict[str, Prompt]): Dictionary mapping prompt IDs to Prompt objects.
         _collections (Dict[str, Collection]): Dictionary mapping collection IDs to Collection objects.
+        _tags (Dict[str, Tag]): Dictionary mapping tag names to Tag objects.
         
     Examples:
         >>> storage = Storage()
@@ -36,6 +37,7 @@ class Storage:
         """Initialize empty storage dictionaries."""
         self._prompts: Dict[str, Prompt] = {}
         self._collections: Dict[str, Collection] = {}
+        self._tags: Dict[str, Tag] = {}
     
     # ============== Prompt Operations ==============
     
@@ -227,6 +229,110 @@ class Storage:
         """
         self._prompts.clear()
         self._collections.clear()
+        self._tags.clear()
+    
+    # ============== Tag Operations ==============
+    
+    def get_all_tags(self) -> List[Tag]:
+        """Get all tags sorted alphabetically.
+        
+        Returns:
+            List[Tag]: List of all Tag objects sorted by name.
+            
+        Examples:
+            >>> tags = storage.get_all_tags()
+            >>> print(f"Found {len(tags)} tags")
+        """
+        tags = list(self._tags.values())
+        return sorted(tags, key=lambda t: t.name)
+    
+    def get_tag(self, tag_name: str) -> Optional[Tag]:
+        """Get a specific tag by name.
+        
+        Args:
+            tag_name: The tag name to retrieve.
+            
+        Returns:
+            Optional[Tag]: The Tag object if found, None otherwise.
+            
+        Examples:
+            >>> tag = storage.get_tag("python")
+            >>> if tag:
+            ...     print(f"Tag usage: {tag.usage_count}")
+        """
+        return self._tags.get(tag_name)
+    
+    def create_or_update_tag(self, tag_name: str) -> Tag:
+        """Create tag if new, or increment usage count if exists.
+        
+        Args:
+            tag_name: The tag name to create or update.
+            
+        Returns:
+            Tag: The created or updated Tag object.
+            
+        Examples:
+            >>> tag = storage.create_or_update_tag("python")
+            >>> assert tag.usage_count == 1
+        """
+        if tag_name in self._tags:
+            self._tags[tag_name].usage_count += 1
+        else:
+            self._tags[tag_name] = Tag(name=tag_name, usage_count=1)
+        return self._tags[tag_name]
+    
+    def update_tag_usage(self, tag_name: str, delta: int):
+        """Update tag usage count by delta (+1 or -1).
+        
+        Args:
+            tag_name: The tag name to update.
+            delta: The change in usage count (typically +1 or -1).
+            
+        Examples:
+            >>> storage.update_tag_usage("python", 1)  # Increment
+            >>> storage.update_tag_usage("python", -1)  # Decrement
+        """
+        if tag_name in self._tags:
+            self._tags[tag_name].usage_count += delta
+            # Remove tag if usage drops to 0
+            if self._tags[tag_name].usage_count <= 0:
+                del self._tags[tag_name]
+    
+    def get_prompts_by_tag(self, tag_name: str) -> List[Prompt]:
+        """Get all prompts with a specific tag.
+        
+        Args:
+            tag_name: The tag name to filter by.
+            
+        Returns:
+            List[Prompt]: List of prompts containing the specified tag.
+            
+        Examples:
+            >>> prompts = storage.get_prompts_by_tag("python")
+            >>> print(f"Found {len(prompts)} Python prompts")
+        """
+        return [p for p in self._prompts.values() if tag_name in p.tags]
+    
+    def get_prompts_by_tags(self, tag_names: List[str]) -> List[Prompt]:
+        """Get prompts that have ALL specified tags (AND logic).
+        
+        Args:
+            tag_names: List of tag names (all must be present).
+            
+        Returns:
+            List[Prompt]: List of prompts containing all specified tags.
+            
+        Examples:
+            >>> prompts = storage.get_prompts_by_tags(["python", "testing"])
+            >>> # Returns only prompts with BOTH tags
+        """
+        if not tag_names:
+            return list(self._prompts.values())
+        
+        return [
+            p for p in self._prompts.values()
+            if all(tag in p.tags for tag in tag_names)
+        ]
 
 
 # Global storage instance

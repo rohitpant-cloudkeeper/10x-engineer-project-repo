@@ -126,3 +126,83 @@ def extract_variables(content: str) -> List[str]:
     import re
     pattern = r'\{\{(\w+)\}\}'
     return re.findall(pattern, content)
+
+
+
+def normalize_tag(tag: str) -> str:
+    """Normalize a tag to standard format.
+    
+    Normalization process:
+    1. Convert to lowercase
+    2. Strip whitespace
+    3. Replace spaces with hyphens
+    4. Remove invalid characters (keep only alphanumeric and hyphens)
+    5. Validate format and length
+    
+    Args:
+        tag: The tag string to normalize.
+        
+    Returns:
+        str: Normalized tag string.
+        
+    Raises:
+        ValueError: If tag is invalid after normalization.
+        
+    Examples:
+        >>> normalize_tag("Python")
+        'python'
+        >>> normalize_tag("Code Review")
+        'code-review'
+        >>> normalize_tag("AI/ML")
+        'aiml'
+    """
+    import re
+    
+    # Convert to lowercase and strip whitespace
+    tag = tag.lower().strip()
+    
+    # Replace spaces with hyphens
+    tag = tag.replace(" ", "-")
+    
+    # Remove invalid characters (keep only alphanumeric and hyphens)
+    tag = re.sub(r'[^a-z0-9-]', '', tag)
+    
+    # Validate format
+    if not re.match(r'^[a-z0-9-]+$', tag):
+        raise ValueError(f"Invalid tag format: {tag}")
+    
+    # Validate length
+    if len(tag) < 1 or len(tag) > 30:
+        raise ValueError(f"Tag length must be 1-30 characters: {tag}")
+    
+    return tag
+
+
+def normalize_tags(tags: List[str]) -> List[str]:
+    """Normalize a list of tags and remove duplicates.
+    
+    Args:
+        tags: List of tag strings to normalize.
+        
+    Returns:
+        List[str]: List of normalized, unique tags.
+        
+    Examples:
+        >>> normalize_tags(["Python", "Code Review", "python"])
+        ['python', 'code-review']
+    """
+    if not tags:
+        return []
+    
+    # Normalize each tag
+    normalized = [normalize_tag(tag) for tag in tags]
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_tags = []
+    for tag in normalized:
+        if tag not in seen:
+            seen.add(tag)
+            unique_tags.append(tag)
+    
+    return unique_tags
