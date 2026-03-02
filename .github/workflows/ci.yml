@@ -3,13 +3,10 @@ name: CI Pipeline
 on:
   push:
     branches:
-      - main
-      - Week-*
-      - develop
+      - ci-testing
   pull_request:
     branches:
-      - main
-      - develop
+      - ci-testing
 
 jobs:
   test:
