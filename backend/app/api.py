@@ -13,10 +13,14 @@ from app.models import (
     Prompt, PromptCreate, PromptUpdate, PromptPatch,
     Collection, CollectionCreate,
     PromptList, CollectionList, HealthResponse,
+    Tag, TagList,
     get_current_time
 )
 from app.storage import storage
-from app.utils import sort_prompts_by_date, filter_prompts_by_collection, search_prompts
+from app.utils import (
+    sort_prompts_by_date, filter_prompts_by_collection, search_prompts,
+    normalize_tags
+)
 from app import __version__
 
 
@@ -61,16 +65,18 @@ def health_check():
 @app.get("/prompts", response_model=PromptList)
 def list_prompts(
     collection_id: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    tags: Optional[str] = None
 ):
     """List all prompts with optional filtering.
     
-    Retrieves all prompts from storage, optionally filtered by collection
-    or search query. Results are sorted by creation date (newest first).
+    Retrieves all prompts from storage, optionally filtered by collection,
+    search query, or tags. Results are sorted by creation date (newest first).
     
     Args:
         collection_id: Optional collection ID to filter prompts.
         search: Optional search query to filter by title or description.
+        tags: Optional comma-separated list of tags (AND logic).
         
     Returns:
         PromptList: Object containing list of prompts and total count.
@@ -84,8 +90,16 @@ def list_prompts(
         >>> 
         >>> # Search prompts
         >>> response = client.get("/prompts?search=code+review")
+        >>> 
+        >>> # Filter by tags
+        >>> response = client.get("/prompts?tags=python,testing")
     """
     prompts = storage.get_all_prompts()
+    
+    # Filter by tags if specified (AND logic)
+    if tags:
+        tag_list = [t.strip() for t in tags.split(",")]
+        prompts = storage.get_prompts_by_tags(tag_list)
     
     # Filter by collection if specified
     if collection_id:
@@ -157,7 +171,18 @@ def create_prompt(prompt_data: PromptCreate):
         if not collection:
             raise HTTPException(status_code=400, detail="Collection not found")
     
-    prompt = Prompt(**prompt_data.model_dump())
+    # Normalize and deduplicate tags
+    normalized_tags = normalize_tags(prompt_data.tags)
+    
+    # Create prompt with normalized tags
+    prompt_dict = prompt_data.model_dump()
+    prompt_dict['tags'] = normalized_tags
+    prompt = Prompt(**prompt_dict)
+    
+    # Update tag usage counts
+    for tag in normalized_tags:
+        storage.create_or_update_tag(tag)
+    
     return storage.create_prompt(prompt)
 
 
@@ -207,6 +232,18 @@ def update_prompt(prompt_id: str, prompt_data: PromptUpdate):
         updated_at=get_current_time()
     )
     
+    # Normalize and deduplicate tags
+    normalized_tags = normalize_tags(prompt_data.tags)
+    updated_prompt.tags = normalized_tags
+    
+    # Update tag usage counts
+    # Remove old tags
+    for tag in existing.tags:
+        storage.update_tag_usage(tag, -1)
+    # Add new tags
+    for tag in normalized_tags:
+        storage.create_or_update_tag(tag)
+    
     return storage.update_prompt(prompt_id, updated_prompt)
 
 
@@ -249,12 +286,26 @@ def patch_prompt(prompt_id: str, prompt_data: PromptPatch):
     # Only update fields that are provided (not None)
     update_data = prompt_data.model_dump(exclude_unset=True)
     
+    # Handle tags if provided
+    if 'tags' in update_data:
+        normalized_tags = normalize_tags(update_data['tags'])
+        update_data['tags'] = normalized_tags
+        
+        # Update tag usage counts
+        # Remove old tags
+        for tag in existing.tags:
+            storage.update_tag_usage(tag, -1)
+        # Add new tags
+        for tag in normalized_tags:
+            storage.create_or_update_tag(tag)
+    
     updated_prompt = Prompt(
         id=existing.id,
         title=update_data.get('title', existing.title),
         content=update_data.get('content', existing.content),
         description=update_data.get('description', existing.description),
         collection_id=update_data.get('collection_id', existing.collection_id),
+        tags=update_data.get('tags', existing.tags),
         created_at=existing.created_at,
         updated_at=get_current_time()
     )
@@ -267,6 +318,7 @@ def delete_prompt(prompt_id: str):
     """Delete a prompt by ID.
     
     Permanently removes the prompt from storage. This operation cannot be undone.
+    Decrements usage count for all tags associated with the prompt.
     
     Args:
         prompt_id: The unique identifier of the prompt to delete.
@@ -282,8 +334,17 @@ def delete_prompt(prompt_id: str):
         >>> response.status_code
         204
     """
-    if not storage.delete_prompt(prompt_id):
+    # Get prompt to access its tags before deletion
+    prompt = storage.get_prompt(prompt_id)
+    if not prompt:
         raise HTTPException(status_code=404, detail="Prompt not found")
+    
+    # Decrement usage count for all tags
+    for tag in prompt.tags:
+        storage.update_tag_usage(tag, -1)
+    
+    # Delete the prompt
+    storage.delete_prompt(prompt_id)
     return None
 
 
@@ -391,3 +452,83 @@ def delete_collection(collection_id: str):
         storage.update_prompt(prompt.id, prompt)
     
     return None
+
+
+# ============== Tag Endpoints ==============
+
+@app.get("/tags", response_model=TagList)
+def list_tags(search: Optional[str] = None):
+    """List all tags with optional search.
+    
+    Retrieves all tags from storage, optionally filtered by search query.
+    Results are sorted alphabetically by tag name.
+    
+    Args:
+        search: Optional search query to filter tags by name (partial match).
+        
+    Returns:
+        TagList: Object containing list of tags and total count.
+        
+    Examples:
+        >>> # Get all tags
+        >>> response = client.get("/tags")
+        >>> 
+        >>> # Search tags
+        >>> response = client.get("/tags?search=python")
+    """
+    tags = storage.get_all_tags()
+    
+    # Filter by search if specified
+    if search:
+        search_lower = search.lower()
+        tags = [t for t in tags if search_lower in t.name]
+    
+    return TagList(tags=tags, total=len(tags))
+
+
+@app.get("/tags/popular", response_model=TagList)
+def get_popular_tags(limit: int = 10):
+    """Get popular tags sorted by usage count.
+    
+    Retrieves tags sorted by usage count in descending order.
+    
+    Args:
+        limit: Maximum number of tags to return (default: 10).
+        
+    Returns:
+        TagList: Object containing list of popular tags and total count.
+        
+    Examples:
+        >>> response = client.get("/tags/popular?limit=5")
+    """
+    tags = storage.get_all_tags()
+    # Sort by usage count descending
+    tags = sorted(tags, key=lambda t: t.usage_count, reverse=True)
+    # Limit results
+    tags = tags[:limit]
+    
+    return TagList(tags=tags, total=len(tags))
+
+
+@app.get("/tags/{tag_name}", response_model=Tag)
+def get_tag(tag_name: str):
+    """Retrieve a specific tag by name.
+    
+    Args:
+        tag_name: The tag name to retrieve.
+        
+    Returns:
+        Tag: The requested tag object with usage count.
+        
+    Raises:
+        HTTPException: 404 if tag not found.
+        
+    Examples:
+        >>> response = client.get("/tags/python")
+        >>> tag = response.json()
+        >>> print(tag['usage_count'])
+    """
+    tag = storage.get_tag(tag_name)
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    return tag
