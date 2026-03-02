@@ -24,7 +24,8 @@ Working with AI models means crafting, testing, and iterating on prompts. Prompt
 
 - 📝 **Template Variables**: Store prompts with placeholders (`{{input}}`, `{{context}}`) for dynamic content
 - 📁 **Collections**: Organize prompts by project, use case, or team
-- 🔍 **Smart Search**: Find prompts by title, description, or collection
+- 🏷️ **Tagging System**: Add multiple tags to prompts for flexible categorization and filtering
+- 🔍 **Smart Search**: Find prompts by title, description, collection, or tags
 - ⚡ **Fast & Lightweight**: In-memory storage with extensibility to databases
 - 🔄 **Flexible Updates**: Full (PUT) or partial (PATCH) updates supported
 - 📚 **Interactive Docs**: Auto-generated API documentation with Swagger UI
@@ -141,6 +142,14 @@ Returns API health status and version.
 | POST | `/collections` | Create a new collection |
 | DELETE | `/collections/{id}` | Delete a collection |
 
+### Tags
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/tags` | List all tags (supports search) |
+| GET | `/tags/{name}` | Get a specific tag by name |
+| GET | `/tags/popular` | Get popular tags sorted by usage |
+
 ### Example Usage
 
 #### Create a Prompt
@@ -151,7 +160,8 @@ curl -X POST "http://localhost:8000/prompts" \
   -d '{
     "title": "Code Review Prompt",
     "content": "Review the following code and provide feedback:\n\n{{code}}",
-    "description": "A prompt for AI code review"
+    "description": "A prompt for AI code review",
+    "tags": ["python", "code-review", "quality"]
   }'
 ```
 
@@ -166,6 +176,38 @@ curl "http://localhost:8000/prompts?collection_id=abc123"
 
 # Search prompts
 curl "http://localhost:8000/prompts?search=code"
+
+# Filter by single tag
+curl "http://localhost:8000/prompts?tags=python"
+
+# Filter by multiple tags (AND logic - must have all tags)
+curl "http://localhost:8000/prompts?tags=python,code-review"
+
+# Combine filters
+curl "http://localhost:8000/prompts?tags=python&search=review&collection_id=abc123"
+```
+
+#### Working with Tags
+
+```bash
+# List all tags
+curl "http://localhost:8000/tags"
+
+# Search tags
+curl "http://localhost:8000/tags?search=python"
+
+# Get specific tag details
+curl "http://localhost:8000/tags/python"
+
+# Get popular tags
+curl "http://localhost:8000/tags/popular?limit=10"
+
+# Add tags to existing prompt (PATCH)
+curl -X PATCH "http://localhost:8000/prompts/{id}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tags": ["python", "testing", "advanced"]
+  }'
 ```
 
 #### Partial Update with PATCH
@@ -176,6 +218,77 @@ curl -X PATCH "http://localhost:8000/prompts/{id}" \
   -d '{
     "title": "Updated Title"
   }'
+```
+
+---
+
+## Tagging System
+
+PromptLab includes a powerful tagging system that allows you to categorize prompts with multiple labels for better organization and discovery.
+
+### Tag Features
+
+- **Multiple Tags per Prompt**: Add up to 10 tags to each prompt
+- **Automatic Normalization**: Tags are automatically converted to lowercase with spaces replaced by hyphens
+- **Usage Tracking**: See how many prompts use each tag
+- **Flexible Filtering**: Filter prompts by one or more tags using AND logic
+- **Tag Search**: Search for tags by name to discover existing tags
+- **Popular Tags**: View most-used tags to understand common categories
+
+### Tag Validation Rules
+
+- Tags must be 1-30 characters long
+- Only lowercase letters, numbers, and hyphens allowed
+- Spaces are automatically replaced with hyphens
+- Invalid characters are removed during normalization
+- Duplicate tags are automatically removed
+
+### Tag Examples
+
+```bash
+# Valid tags (after normalization)
+"Python" → "python"
+"Code Review" → "code-review"
+"AI/ML" → "aiml"
+"python-3.11" → "python-3-11"
+
+# Creating a prompt with tags
+{
+  "title": "Python Testing Guide",
+  "content": "Write unit tests for: {{code}}",
+  "tags": ["Python", "Testing", "Unit Tests"]
+}
+# Tags stored as: ["python", "testing", "unit-tests"]
+```
+
+### Tag Filtering
+
+Tags use AND logic when filtering - prompts must have ALL specified tags:
+
+```bash
+# Find prompts with BOTH "python" AND "testing" tags
+curl "http://localhost:8000/prompts?tags=python,testing"
+
+# Combine with other filters
+curl "http://localhost:8000/prompts?tags=python,advanced&search=async&collection_id=abc123"
+```
+
+### Tag Management
+
+Tags are created automatically when first used and deleted automatically when no longer in use:
+
+```bash
+# Create prompt with new tags (tags created automatically)
+POST /prompts {"tags": ["new-tag", "another-tag"]}
+
+# View all tags with usage counts
+GET /tags
+
+# Get popular tags
+GET /tags/popular?limit=5
+
+# Search for specific tags
+GET /tags?search=python
 ```
 
 ---
@@ -277,8 +390,8 @@ We follow conventional commits:
 ## Roadmap
 
 - [x] Week 1: Backend Foundation (Bug fixes, PATCH endpoint)
-- [ ] Week 2: Documentation & Specifications
-- [ ] Week 3: Testing & DevOps (CI/CD, Docker)
+- [x] Week 2: Documentation & Specifications
+- [x] Week 3: Testing & Tagging System (Comprehensive tests, TDD, Tagging feature)
 - [ ] Week 4: Full-Stack Integration (React frontend)
 
 ---
