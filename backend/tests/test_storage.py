@@ -86,6 +86,12 @@ class TestPromptOperations:
         assert result is not None
         assert result.title == "Updated Title"
         assert result.content == "Updated content"
+        
+        # Verify persistence by reading back
+        retrieved = storage.get_prompt(sample_prompt.id)
+        assert retrieved is not None
+        assert retrieved.title == "Updated Title"
+        assert retrieved.content == "Updated content"
     
     def test_update_prompt_not_exists(self, storage, sample_prompt):
         """Test updating a non-existent prompt returns None."""
