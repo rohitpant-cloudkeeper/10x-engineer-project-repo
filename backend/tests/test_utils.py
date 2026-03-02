@@ -199,6 +199,14 @@ class TestSearchPrompts:
         ]
         result = search_prompts(prompts, "python")
         assert len(result) == 2
+        
+        # Also test when title doesn't match and description is None
+        # This ensures we handle None descriptions correctly
+        prompts_no_match = [
+            Prompt(title="NoMatch", content="Content", description=None),
+        ]
+        result_no_match = search_prompts(prompts_no_match, "python")
+        assert len(result_no_match) == 0
 
 
 class TestValidatePromptContent:
