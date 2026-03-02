@@ -128,6 +128,8 @@ class Prompt(PromptBase):
     
     Attributes:
         id (str): Unique identifier (auto-generated UUID4).
+        version (int): Current version number.
+        version_count (int): Total number of versions.
         created_at (datetime): Timestamp when prompt was created (auto-generated).
         updated_at (datetime): Timestamp when prompt was last updated (auto-generated).
         
@@ -140,6 +142,8 @@ class Prompt(PromptBase):
         >>> assert prompt.created_at is not None
     """
     id: str = Field(default_factory=generate_id, description="Unique prompt identifier")
+    version: int = Field(default=1, description="Current version number")
+    version_count: int = Field(default=1, description="Total number of versions")
     created_at: datetime = Field(default_factory=get_current_time, description="Creation timestamp")
     updated_at: datetime = Field(default_factory=get_current_time, description="Last update timestamp")
 
@@ -183,6 +187,93 @@ class TagList(BaseModel):
     """
     tags: List[Tag] = Field(..., description="List of tags")
     total: int = Field(..., description="Total number of tags")
+
+
+# ============== Version Models ==============
+
+class PromptVersion(BaseModel):
+    """A historical version of a prompt.
+    
+    Stores the complete state of a prompt at a specific point in time.
+    Versions are created automatically when prompts are updated.
+    
+    Attributes:
+        id (str): Unique version identifier (auto-generated UUID4).
+        prompt_id (str): ID of the parent prompt.
+        version (int): Version number (1, 2, 3, ...).
+        title (str): Prompt title at this version.
+        content (str): Prompt content at this version.
+        description (Optional[str]): Prompt description at this version.
+        collection_id (Optional[str]): Collection ID at this version.
+        tags (List[str]): Tags at this version.
+        created_at (datetime): When this version was created.
+        created_by (Optional[str]): User who created this version (future).
+        
+    Examples:
+        >>> version = PromptVersion(
+        ...     prompt_id="prompt-123",
+        ...     version=1,
+        ...     title="Test",
+        ...     content="Content"
+        ... )
+    """
+    id: str = Field(default_factory=generate_id, description="Unique version identifier")
+    prompt_id: str = Field(..., description="Parent prompt ID")
+    version: int = Field(..., gt=0, description="Version number (must be positive)")
+    title: str = Field(..., min_length=1, max_length=200, description="Prompt title")
+    content: str = Field(..., min_length=1, description="Prompt content")
+    description: Optional[str] = Field(None, max_length=500, description="Optional description")
+    collection_id: Optional[str] = Field(None, description="Collection ID")
+    tags: List[str] = Field(default_factory=list, max_items=10, description="Tags")
+    created_at: datetime = Field(default_factory=get_current_time, description="Creation timestamp")
+    created_by: Optional[str] = Field(None, description="User who created this version")
+
+
+class PromptVersionList(BaseModel):
+    """Response model for listing prompt versions.
+    
+    Used by GET /prompts/{id}/versions endpoint.
+    
+    Attributes:
+        versions (List[PromptVersion]): List of version objects.
+        total (int): Total count of versions.
+        prompt_id (str): ID of the parent prompt.
+        
+    Examples:
+        >>> response = PromptVersionList(
+        ...     versions=[v1, v2],
+        ...     total=2,
+        ...     prompt_id="prompt-123"
+        ... )
+    """
+    versions: List[PromptVersion] = Field(..., description="List of versions")
+    total: int = Field(..., description="Total number of versions")
+    prompt_id: str = Field(..., description="Parent prompt ID")
+
+
+class VersionComparison(BaseModel):
+    """Response model for comparing two versions.
+    
+    Used by GET /prompts/{id}/versions/compare endpoint.
+    
+    Attributes:
+        prompt_id (str): ID of the parent prompt.
+        from_version (PromptVersion): First version to compare.
+        to_version (PromptVersion): Second version to compare.
+        changes (dict): Dictionary showing which fields changed.
+        
+    Examples:
+        >>> comparison = VersionComparison(
+        ...     prompt_id="prompt-123",
+        ...     from_version=v1,
+        ...     to_version=v2,
+        ...     changes={"title": "changed", "content": "unchanged"}
+        ... )
+    """
+    prompt_id: str = Field(..., description="Parent prompt ID")
+    from_version: PromptVersion = Field(..., description="First version")
+    to_version: PromptVersion = Field(..., description="Second version")
+    changes: dict = Field(..., description="Fields that changed")
 
 
 # ============== Collection Models ==============

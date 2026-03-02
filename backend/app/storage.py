@@ -11,7 +11,7 @@ Note:
 """
 
 from typing import Dict, List, Optional
-from app.models import Prompt, Collection, Tag
+from app.models import Prompt, Collection, Tag, PromptVersion
 
 
 class Storage:
@@ -38,6 +38,7 @@ class Storage:
         self._prompts: Dict[str, Prompt] = {}
         self._collections: Dict[str, Collection] = {}
         self._tags: Dict[str, Tag] = {}
+        self._versions: Dict[str, List[PromptVersion]] = {}  # prompt_id -> list of versions
     
     # ============== Prompt Operations ==============
     
@@ -230,6 +231,96 @@ class Storage:
         self._prompts.clear()
         self._collections.clear()
         self._tags.clear()
+        self._versions.clear()
+    
+    # ============== Version Operations ==============
+    
+    def create_version(self, version: PromptVersion) -> PromptVersion:
+        """Store a new prompt version.
+        
+        Args:
+            version: The PromptVersion object to store.
+            
+        Returns:
+            PromptVersion: The stored version object.
+            
+        Examples:
+            >>> version = PromptVersion(prompt_id="p-123", version=1, title="Test", content="Content")
+            >>> stored = storage.create_version(version)
+        """
+        if version.prompt_id not in self._versions:
+            self._versions[version.prompt_id] = []
+        self._versions[version.prompt_id].append(version)
+        return version
+    
+    def get_versions(self, prompt_id: str) -> List[PromptVersion]:
+        """Get all versions for a prompt, sorted by version number (newest first).
+        
+        Args:
+            prompt_id: The unique identifier of the prompt.
+            
+        Returns:
+            List[PromptVersion]: List of versions sorted by version number descending.
+            
+        Examples:
+            >>> versions = storage.get_versions("p-123")
+            >>> print(f"Found {len(versions)} versions")
+        """
+        if prompt_id not in self._versions:
+            return []
+        versions = self._versions[prompt_id]
+        return sorted(versions, key=lambda v: v.version, reverse=True)
+    
+    def get_version(self, prompt_id: str, version: int) -> Optional[PromptVersion]:
+        """Get a specific version by number.
+        
+        Args:
+            prompt_id: The unique identifier of the prompt.
+            version: The version number to retrieve.
+            
+        Returns:
+            Optional[PromptVersion]: The version object if found, None otherwise.
+            
+        Examples:
+            >>> version = storage.get_version("p-123", 2)
+            >>> if version:
+            ...     print(f"Version {version.version}: {version.title}")
+        """
+        if prompt_id not in self._versions:
+            return None
+        for v in self._versions[prompt_id]:
+            if v.version == version:
+                return v
+        return None
+    
+    def get_version_count(self, prompt_id: str) -> int:
+        """Get total version count for a prompt.
+        
+        Args:
+            prompt_id: The unique identifier of the prompt.
+            
+        Returns:
+            int: Number of versions for this prompt.
+            
+        Examples:
+            >>> count = storage.get_version_count("p-123")
+            >>> print(f"Prompt has {count} versions")
+        """
+        if prompt_id not in self._versions:
+            return 0
+        return len(self._versions[prompt_id])
+    
+    def delete_versions_for_prompt(self, prompt_id: str):
+        """Delete all versions for a prompt.
+        
+        Args:
+            prompt_id: The unique identifier of the prompt.
+            
+        Examples:
+            >>> storage.delete_versions_for_prompt("p-123")
+        """
+        if prompt_id in self._versions:
+            del self._versions[prompt_id]
     
     # ============== Tag Operations ==============
     
