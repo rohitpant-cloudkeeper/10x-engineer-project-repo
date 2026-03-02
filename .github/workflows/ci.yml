@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - ci-testing
+      - Week-3
   pull_request:
     branches:
       - ci-testing
+      - Week-3
 
 jobs:
   test:
