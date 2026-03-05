@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { promptsAPI, collectionsAPI, tagsAPI } from '../services/api';
+import Button from '../components/Button';
+import { ArrowLeftIcon } from '../components/Icons';
 import './PromptForm.css';
 
 function PromptForm() {
@@ -161,9 +163,9 @@ function PromptForm() {
       <div className="form-container">
         <div className="form-header">
           <h1>{isEditMode ? 'Edit Prompt' : 'Create New Prompt'}</h1>
-          <button onClick={() => navigate('/')} className="btn-secondary">
-            Cancel
-          </button>
+          <Button variant="secondary" onClick={() => navigate('/')}>
+            <ArrowLeftIcon size={16} /> Cancel
+          </Button>
         </div>
 
         {submitError && (
@@ -300,21 +302,20 @@ function PromptForm() {
           </div>
 
           <div className="form-actions">
-            <button
+            <Button
               type="submit"
-              className="btn-primary"
               disabled={loading}
             >
               {loading ? 'Saving...' : isEditMode ? 'Update Prompt' : 'Create Prompt'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => navigate('/')}
-              className="btn-secondary"
               disabled={loading}
             >
-              Cancel
-            </button>
+              <ArrowLeftIcon size={16} /> Cancel
+            </Button>
           </div>
         </form>
       </div>

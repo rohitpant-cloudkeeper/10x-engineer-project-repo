@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 import { collectionsAPI, promptsAPI } from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorMessage from '../components/ErrorMessage';
+import Button from '../components/Button';
+import { TrashIcon, PlusIcon, ArrowLeftIcon } from '../components/Icons';
 import './Collections.css';
 
 function Collections() {
@@ -71,30 +75,22 @@ function Collections() {
   };
 
   if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="spinner"></div>
-        <p>Loading collections...</p>
-      </div>
-    );
+    return <LoadingSpinner size="large" message="Loading collections..." />;
   }
 
   if (error) {
-    return (
-      <div className="error-container">
-        <p className="error-message">{error}</p>
-        <button onClick={fetchCollections} className="btn-retry">Retry</button>
-      </div>
-    );
+    return <ErrorMessage message={error} onRetry={fetchCollections} />;
   }
 
   return (
     <div className="collections-page">
       <div className="page-header">
         <h1>Collections</h1>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary">
-          {showForm ? 'Cancel' : '+ New Collection'}
-        </button>
+        <Button onClick={() => setShowForm(!showForm)}>
+          {showForm ? <ArrowLeftIcon size={16} /> : <PlusIcon size={16} />}
+          {' '}
+          {showForm ? 'Cancel' : 'New Collection'}
+        </Button>
       </div>
 
       {showForm && (
@@ -125,10 +121,14 @@ function Collections() {
             </div>
 
             <div className="form-actions">
-              <button type="submit" className="btn-primary">Create Collection</button>
-              <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">
+              <Button type="submit">Create Collection</Button>
+              <Button 
+                type="button" 
+                variant="secondary"
+                onClick={() => setShowForm(false)}
+              >
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -139,9 +139,9 @@ function Collections() {
           <div className="empty-icon">📁</div>
           <h2>No collections yet</h2>
           <p>Create your first collection to organize your prompts!</p>
-          <button onClick={() => setShowForm(true)} className="btn-primary">
+          <Button onClick={() => setShowForm(true)}>
             Create Collection
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="collections-grid">
@@ -154,7 +154,7 @@ function Collections() {
                   className="btn-icon btn-danger"
                   title="Delete"
                 >
-                  🗑️
+                  <TrashIcon size={16} />
                 </button>
               </div>
 

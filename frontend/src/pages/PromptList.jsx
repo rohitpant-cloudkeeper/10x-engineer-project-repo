@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { promptsAPI, collectionsAPI, tagsAPI } from '../services/api';
+import PromptCard from '../components/PromptCard';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorMessage from '../components/ErrorMessage';
+import SearchBar from '../components/SearchBar';
+import Button from '../components/Button';
+import { PlusIcon } from '../components/Icons';
+import { searchPrompts } from '../utils/searchUtils';
 import './PromptList.css';
 
 function PromptList() {
@@ -60,8 +67,7 @@ function PromptList() {
     }
   };
 
-  const handleDelete = async (id, e) => {
-    e.stopPropagation();
+  const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this prompt?')) return;
 
     try {
@@ -73,8 +79,7 @@ function PromptList() {
     }
   };
 
-  const handleEdit = (id, e) => {
-    e.stopPropagation();
+  const handleEdit = (id) => {
     navigate(`/prompts/${id}/edit`);
   };
 
@@ -86,7 +91,28 @@ function PromptList() {
     );
   };
 
-  const sortedPrompts = [...prompts].sort((a, b) => {
+  // Apply all filters
+  let filteredPrompts = [...prompts];
+
+  // Filter by collection
+  if (selectedCollection) {
+    filteredPrompts = filteredPrompts.filter(p => p.collection_id === selectedCollection);
+  }
+
+  // Filter by tags
+  if (selectedTags.length > 0) {
+    filteredPrompts = filteredPrompts.filter(p => 
+      selectedTags.every(tag => p.tags?.includes(tag))
+    );
+  }
+
+  // Filter by search
+  if (searchQuery) {
+    filteredPrompts = searchPrompts(filteredPrompts, searchQuery);
+  }
+
+  // Sort
+  const sortedPrompts = [...filteredPrompts].sort((a, b) => {
     if (sortBy === 'date') {
       return new Date(b.created_at) - new Date(a.created_at);
     } else if (sortBy === 'title') {
@@ -96,41 +122,30 @@ function PromptList() {
   });
 
   if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="spinner"></div>
-        <p>Loading prompts...</p>
-      </div>
-    );
+    return <LoadingSpinner size="large" message="Loading prompts..." />;
   }
 
   if (error) {
-    return (
-      <div className="error-container">
-        <p className="error-message">{error}</p>
-        <button onClick={fetchData} className="btn-retry">Retry</button>
-      </div>
-    );
+    return <ErrorMessage message={error} onRetry={fetchData} />;
   }
 
   return (
     <div className="prompt-list-page">
       <div className="page-header">
         <h1>Prompts</h1>
-        <button onClick={() => navigate('/prompts/new')} className="btn-primary">
-          + New Prompt
-        </button>
+        <Button onClick={() => navigate('/prompts/new')}>
+          <PlusIcon size={16} /> New Prompt
+        </Button>
       </div>
 
       <div className="filters-section">
         <div className="filter-group">
           <label>Search</label>
-          <input
-            type="text"
-            placeholder="Search prompts..."
+          <SearchBar
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
+            onChange={setSearchQuery}
+            onClear={() => setSearchQuery('')}
+            placeholder="Search prompts..."
           />
         </div>
 
@@ -205,62 +220,20 @@ function PromptList() {
               : 'Create your first prompt to get started!'}
           </p>
           {!searchQuery && !selectedTags.length && !selectedCollection && (
-            <button onClick={() => navigate('/prompts/new')} className="btn-primary">
-              Create Prompt
-            </button>
+            <Button onClick={() => navigate('/prompts/new')}>
+              <PlusIcon size={16} /> Create Prompt
+            </Button>
           )}
         </div>
       ) : (
         <div className="prompts-grid">
           {sortedPrompts.map((prompt) => (
-            <div key={prompt.id} className="prompt-card">
-              <div className="prompt-header">
-                <h3>{prompt.title}</h3>
-                <div className="prompt-actions">
-                  <button
-                    onClick={(e) => handleEdit(prompt.id, e)}
-                    className="btn-icon"
-                    title="Edit"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={(e) => handleDelete(prompt.id, e)}
-                    className="btn-icon btn-danger"
-                    title="Delete"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-
-              <p className="prompt-content">
-                {prompt.content.length > 150
-                  ? `${prompt.content.substring(0, 150)}...`
-                  : prompt.content}
-              </p>
-
-              {prompt.description && (
-                <p className="prompt-description">{prompt.description}</p>
-              )}
-
-              {prompt.tags && prompt.tags.length > 0 && (
-                <div className="tags">
-                  {prompt.tags.map((tag) => (
-                    <span key={tag} className="tag">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div className="prompt-meta">
-                <span className="version">v{prompt.version}</span>
-                <span className="date">
-                  {new Date(prompt.created_at).toLocaleDateString()}
-                </span>
-              </div>
-            </div>
+            <PromptCard
+              key={prompt.id}
+              prompt={prompt}
+              onDelete={handleDelete}
+              onEdit={handleEdit}
+            />
           ))}
         </div>
       )}
