@@ -86,7 +86,7 @@ function Collections() {
     <div className="collections-page">
       <div className="page-header">
         <h1>Collections</h1>
-        <Button onClick={() => setShowForm(!showForm)}>
+        <Button onClick={() => setShowForm(!showForm)} size="small">
           {showForm ? <ArrowLeftIcon size={16} /> : <PlusIcon size={16} />}
           {' '}
           {showForm ? 'Cancel' : 'New Collection'}
@@ -121,10 +121,11 @@ function Collections() {
             </div>
 
             <div className="form-actions">
-              <Button type="submit">Create Collection</Button>
+              <Button type="submit" size="small">Create Collection</Button>
               <Button 
                 type="button" 
                 variant="secondary"
+                size="small"
                 onClick={() => setShowForm(false)}
               >
                 Cancel
@@ -139,7 +140,7 @@ function Collections() {
           <div className="empty-icon">📁</div>
           <h2>No collections yet</h2>
           <p>Create your first collection to organize your prompts!</p>
-          <Button onClick={() => setShowForm(true)}>
+          <Button onClick={() => setShowForm(true)} size="small">
             Create Collection
           </Button>
         </div>

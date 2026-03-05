@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import './App.css';
 import PromptList from './pages/PromptList';
@@ -7,7 +7,6 @@ import PromptDetail from './pages/PromptDetail';
 import Collections from './pages/Collections';
 import ThemeToggle from './components/ThemeToggle';
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp';
-import { PlusIcon } from './components/Icons';
 import { useTheme } from './hooks/useTheme';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
@@ -48,24 +47,19 @@ function AppContent() {
     <div className="app">
       <nav className="navbar">
         <div className="nav-container">
-          <Link to="/" className="nav-logo">
+          <NavLink to="/" className="nav-logo">
             PromptLab
-          </Link>
+          </NavLink>
           <ul className="nav-menu">
             <li className="nav-item">
-              <Link to="/" className="nav-link">
+              <NavLink to="/" end className="nav-link">
                 Prompts
-              </Link>
+              </NavLink>
             </li>
             <li className="nav-item">
-              <Link to="/collections" className="nav-link">
+              <NavLink to="/collections" className="nav-link">
                 Collections
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link to="/prompts/new" className="nav-link nav-link-primary">
-                <PlusIcon size={16} /> New Prompt
-              </Link>
+              </NavLink>
             </li>
             <li className="nav-item">
               <ThemeToggle theme={theme} onToggle={toggleTheme} />

@@ -188,7 +188,7 @@ function PromptList() {
     <div className="prompt-list-page">
       <div className="page-header">
         <h1>Prompts</h1>
-        <Button onClick={() => navigate('/prompts/new')}>
+        <Button onClick={() => navigate('/prompts/new')} size="small">
           <PlusIcon size={16} /> New Prompt
         </Button>
       </div>
@@ -289,7 +289,7 @@ function PromptList() {
               : 'Create your first prompt to get started!'}
           </p>
           {!searchQuery && !selectedTags.length && !selectedCollection && (
-            <Button onClick={() => navigate('/prompts/new')}>
+            <Button onClick={() => navigate('/prompts/new')} size="small">
               <PlusIcon size={16} /> Create Prompt
             </Button>
           )}
