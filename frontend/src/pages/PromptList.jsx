@@ -23,6 +23,7 @@ function PromptList() {
   const [selectedTags, setSelectedTags] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('date');
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -32,18 +33,21 @@ function PromptList() {
     fetchPrompts();
   }, [selectedCollection, selectedTags, searchQuery]);
 
+  // Update available tags when collection changes
+  useEffect(() => {
+    updateAvailableTags();
+  }, [selectedCollection, prompts]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [promptsRes, collectionsRes, tagsRes] = await Promise.all([
+      const [promptsRes, collectionsRes] = await Promise.all([
         promptsAPI.getAll(),
         collectionsAPI.getAll(),
-        tagsAPI.getAll(),
       ]);
       
       setPrompts(promptsRes.data.prompts);
       setCollections(collectionsRes.data.collections);
-      setTags(tagsRes.data.tags);
       setError(null);
     } catch (err) {
       setError('Failed to load data');
@@ -65,6 +69,32 @@ function PromptList() {
     } catch (err) {
       console.error('Error fetching prompts:', err);
     }
+  };
+
+  const updateAvailableTags = () => {
+    // Get tags from currently filtered prompts (by collection only, not by selected tags)
+    let relevantPrompts = prompts;
+    if (selectedCollection) {
+      relevantPrompts = prompts.filter(p => p.collection_id === selectedCollection);
+    }
+
+    // Count tag usage in relevant prompts
+    const tagCounts = {};
+    relevantPrompts.forEach(prompt => {
+      if (prompt.tags && Array.isArray(prompt.tags)) {
+        prompt.tags.forEach(tag => {
+          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        });
+      }
+    });
+
+    // Convert to array format matching the API response
+    const tagsArray = Object.entries(tagCounts).map(([name, usage_count]) => ({
+      name,
+      usage_count
+    }));
+
+    setTags(tagsArray);
   };
 
   const handleDelete = async (id) => {
@@ -90,6 +120,31 @@ function PromptList() {
         : [...prev, tag]
     );
   };
+
+  // Fuzzy search for tags
+  const fuzzyMatchTag = (tag, query) => {
+    if (!query) return true;
+    
+    const tagLower = tag.toLowerCase();
+    const queryLower = query.toLowerCase();
+    
+    // Exact match or contains
+    if (tagLower.includes(queryLower)) return true;
+    
+    // Fuzzy match - check if all characters in query appear in order in tag
+    let queryIndex = 0;
+    for (let i = 0; i < tagLower.length && queryIndex < queryLower.length; i++) {
+      if (tagLower[i] === queryLower[queryIndex]) {
+        queryIndex++;
+      }
+    }
+    return queryIndex === queryLower.length;
+  };
+
+  // Sort tags by usage count (descending) and filter by search
+  const filteredAndSortedTags = tags
+    .filter(tag => fuzzyMatchTag(tag.name, tagSearchQuery))
+    .sort((a, b) => b.usage_count - a.usage_count);
 
   // Apply all filters
   let filteredPrompts = [...prompts];
@@ -180,18 +235,32 @@ function PromptList() {
 
       {tags.length > 0 && (
         <div className="tags-filter">
-          <label>Filter by tags:</label>
-          <div className="tags-list">
-            {tags.map((tag) => (
-              <button
-                key={tag.name}
-                onClick={() => toggleTag(tag.name)}
-                className={`tag-filter ${selectedTags.includes(tag.name) ? 'active' : ''}`}
-              >
-                {tag.name} ({tag.usage_count})
-              </button>
-            ))}
+          <div className="tags-filter-header">
+            <label>Filter by tags:</label>
+            <input
+              type="text"
+              placeholder="Search tags..."
+              value={tagSearchQuery}
+              onChange={(e) => setTagSearchQuery(e.target.value)}
+              className="tag-search-input"
+            />
           </div>
+          <div className="tags-list-container">
+            <div className="tags-list">
+              {filteredAndSortedTags.map((tag) => (
+                <button
+                  key={tag.name}
+                  onClick={() => toggleTag(tag.name)}
+                  className={`tag-filter ${selectedTags.includes(tag.name) ? 'active' : ''}`}
+                >
+                  {tag.name} ({tag.usage_count})
+                </button>
+              ))}
+            </div>
+          </div>
+          {filteredAndSortedTags.length === 0 && tagSearchQuery && (
+            <div className="no-tags-found">No tags found matching "{tagSearchQuery}"</div>
+          )}
         </div>
       )}
 
