@@ -26,11 +26,26 @@ function AppContent() {
       }
     },
     {
-      key: 'n',
+      key: 'p',
       ctrl: true,
       callback: (e) => {
         e.preventDefault();
         navigate('/prompts/new');
+      }
+    },
+    {
+      key: 'c',
+      ctrl: true,
+      callback: (e) => {
+        e.preventDefault();
+        navigate('/collections');
+        // Small delay to ensure navigation completes before triggering form
+        setTimeout(() => {
+          const newCollectionBtn = document.querySelector('.page-header button');
+          if (newCollectionBtn && window.location.pathname === '/collections') {
+            newCollectionBtn.click();
+          }
+        }, 100);
       }
     },
     {

@@ -8,7 +8,8 @@ function KeyboardShortcutsHelp({ isOpen, onClose }) {
 
   const shortcuts = [
     { keys: `${modKey} + K`, description: 'Focus search bar' },
-    { keys: `${modKey} + N`, description: 'Create new prompt' },
+    { keys: `${modKey} + P`, description: 'Create new prompt' },
+    { keys: `${modKey} + C`, description: 'Create new collection' },
     { keys: 'Escape', description: 'Close modals' },
   ];
 
