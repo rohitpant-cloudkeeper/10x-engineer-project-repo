@@ -1,17 +1,26 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collectionsAPI, promptsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
+import SearchBar from '../components/SearchBar';
 import Button from '../components/Button';
+import ConfirmDialog from '../components/ConfirmDialog';
+import Toast from '../components/Toast';
 import { TrashIcon, PlusIcon, ArrowLeftIcon } from '../components/Icons';
+import { useToast } from '../hooks/useToast';
 import './Collections.css';
 
 function Collections() {
+  const navigate = useNavigate();
+  const { toast, showToast, hideToast } = useToast();
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ name: '', description: '' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'default' });
 
   useEffect(() => {
     fetchCollections();
@@ -47,7 +56,7 @@ function Collections() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      alert('Collection name is required');
+      showToast('Collection name is required', 'error');
       return;
     }
 
@@ -56,22 +65,37 @@ function Collections() {
       setFormData({ name: '', description: '' });
       setShowForm(false);
       fetchCollections();
+      showToast('Collection created successfully', 'success');
     } catch (err) {
-      alert('Failed to create collection');
+      showToast('Failed to create collection', 'error');
       console.error('Error creating collection:', err);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this collection?')) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Collection',
+      message: 'Are you sure you want to delete this collection? This action cannot be undone.',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await collectionsAPI.delete(id);
+          setCollections(collections.filter(c => c.id !== id));
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          showToast('Collection deleted successfully', 'success');
+        } catch (err) {
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          showToast('Failed to delete collection', 'error');
+          console.error('Error deleting collection:', err);
+        }
+      }
+    });
+  };
 
-    try {
-      await collectionsAPI.delete(id);
-      setCollections(collections.filter(c => c.id !== id));
-    } catch (err) {
-      alert('Failed to delete collection');
-      console.error('Error deleting collection:', err);
-    }
+  const handleViewPrompts = (collectionId) => {
+    // Navigate to prompts page with collection pre-selected
+    navigate(`/?collection=${collectionId}`);
   };
 
   if (loading) {
@@ -81,6 +105,17 @@ function Collections() {
   if (error) {
     return <ErrorMessage message={error} onRetry={fetchCollections} />;
   }
+
+  // Filter collections based on search query
+  const filteredCollections = collections.filter(collection => {
+    if (!searchQuery) return true;
+    
+    const query = searchQuery.toLowerCase();
+    const nameMatch = collection.name.toLowerCase().includes(query);
+    const descriptionMatch = collection.description?.toLowerCase().includes(query);
+    
+    return nameMatch || descriptionMatch;
+  });
 
   return (
     <div className="collections-page">
@@ -92,6 +127,17 @@ function Collections() {
           {showForm ? 'Cancel' : 'New Collection'}
         </Button>
       </div>
+
+      {!showForm && collections.length > 0 && (
+        <div className="search-section">
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onClear={() => setSearchQuery('')}
+            placeholder="Search collections by name or description..."
+          />
+        </div>
+      )}
 
       {showForm && (
         <div className="collection-form-card">
@@ -144,9 +190,18 @@ function Collections() {
             Create Collection
           </Button>
         </div>
+      ) : filteredCollections.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">🔍</div>
+          <h2>No collections found</h2>
+          <p>No collections match your search "{searchQuery}"</p>
+          <Button onClick={() => setSearchQuery('')} size="small" variant="secondary">
+            Clear Search
+          </Button>
+        </div>
       ) : (
         <div className="collections-grid">
-          {collections.map((collection) => (
+          {filteredCollections.map((collection) => (
             <div key={collection.id} className="collection-card">
               <div className="collection-header">
                 <h3>{collection.name}</h3>
@@ -164,9 +219,19 @@ function Collections() {
               )}
 
               <div className="collection-meta">
-                <span className="prompt-count">
-                  {collection.promptCount} {collection.promptCount === 1 ? 'prompt' : 'prompts'}
-                </span>
+                {collection.promptCount > 0 ? (
+                  <button
+                    onClick={() => handleViewPrompts(collection.id)}
+                    className="prompt-count clickable"
+                    title="View prompts in this collection"
+                  >
+                    {collection.promptCount} {collection.promptCount === 1 ? 'prompt' : 'prompts'}
+                  </button>
+                ) : (
+                  <span className="prompt-count">
+                    0 prompts
+                  </span>
+                )}
                 <span className="date">
                   Created {new Date(collection.created_at).toLocaleDateString()}
                 </span>
@@ -175,6 +240,24 @@ function Collections() {
           ))}
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
+
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 }

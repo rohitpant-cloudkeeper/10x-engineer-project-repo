@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { promptsAPI, collectionsAPI, tagsAPI } from '../services/api';
 import Button from '../components/Button';
+import Toast from '../components/Toast';
 import { ArrowLeftIcon } from '../components/Icons';
+import { useToast } from '../hooks/useToast';
 import './PromptForm.css';
 
 function PromptForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
+  const { toast, showToast, hideToast } = useToast();
 
   const [formData, setFormData] = useState({
     title: '',
@@ -104,16 +107,18 @@ function PromptForm() {
 
       if (isEditMode) {
         await promptsAPI.update(id, submitData);
+        showToast('Prompt updated successfully', 'success');
       } else {
         await promptsAPI.create(submitData);
+        showToast('Prompt created successfully', 'success');
       }
 
       navigate('/');
     } catch (err) {
       console.error('Error saving prompt:', err);
-      setSubmitError(
-        err.response?.data?.detail || 'Failed to save prompt. Please try again.'
-      );
+      const errorMessage = err.response?.data?.detail || 'Failed to save prompt. Please try again.';
+      setSubmitError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -319,6 +324,14 @@ function PromptForm() {
           </div>
         </form>
       </div>
+
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 }

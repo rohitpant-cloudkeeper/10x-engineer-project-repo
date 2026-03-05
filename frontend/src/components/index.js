@@ -8,3 +8,4 @@ export { default as ThemeToggle } from './ThemeToggle';
 export { default as CopyButton } from './CopyButton';
 export { default as HighlightedText } from './HighlightedText';
 export { default as PromptPreview } from './PromptPreview';
+export { default as ConfirmDialog } from './ConfirmDialog';

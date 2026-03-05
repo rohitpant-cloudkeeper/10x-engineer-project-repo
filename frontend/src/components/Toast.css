@@ -1,0 +1,133 @@
+.toast {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  min-width: 300px;
+  max-width: 500px;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  z-index: 10000;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.toast-icon {
+  font-size: 1.25rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Success Toast */
+.toast-success {
+  background-color: #10b981;
+  color: white;
+}
+
+.toast-success .toast-icon {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.toast-success .toast-close {
+  color: white;
+}
+
+.toast-success .toast-close:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Error Toast */
+.toast-error {
+  background-color: #ef4444;
+  color: white;
+}
+
+.toast-error .toast-icon {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.toast-error .toast-close {
+  color: white;
+}
+
+.toast-error .toast-close:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Info Toast */
+.toast-info {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.toast-info .toast-icon {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.toast-info .toast-close {
+  color: white;
+}
+
+.toast-info .toast-close:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .toast {
+    top: 60px;
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    max-width: none;
+  }
+}

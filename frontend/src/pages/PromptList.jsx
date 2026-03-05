@@ -1,17 +1,22 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { promptsAPI, collectionsAPI, tagsAPI } from '../services/api';
 import PromptCard from '../components/PromptCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import SearchBar from '../components/SearchBar';
 import Button from '../components/Button';
+import ConfirmDialog from '../components/ConfirmDialog';
+import Toast from '../components/Toast';
 import { PlusIcon } from '../components/Icons';
 import { searchPrompts } from '../utils/searchUtils';
+import { useToast } from '../hooks/useToast';
 import './PromptList.css';
 
 function PromptList() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast, showToast, hideToast } = useToast();
   const [prompts, setPrompts] = useState([]);
   const [collections, setCollections] = useState([]);
   const [tags, setTags] = useState([]);
@@ -24,10 +29,19 @@ function PromptList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('date');
   const [tagSearchQuery, setTagSearchQuery] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'default' });
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Check for collection parameter in URL
+  useEffect(() => {
+    const collectionParam = searchParams.get('collection');
+    if (collectionParam) {
+      setSelectedCollection(collectionParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchPrompts();
@@ -98,15 +112,24 @@ function PromptList() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this prompt?')) return;
-
-    try {
-      await promptsAPI.delete(id);
-      setPrompts(prompts.filter(p => p.id !== id));
-    } catch (err) {
-      alert('Failed to delete prompt');
-      console.error('Error deleting prompt:', err);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Prompt',
+      message: 'Are you sure you want to delete this prompt? This action cannot be undone.',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await promptsAPI.delete(id);
+          setPrompts(prompts.filter(p => p.id !== id));
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          showToast('Prompt deleted successfully', 'success');
+        } catch (err) {
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          showToast('Failed to delete prompt', 'error');
+          console.error('Error deleting prompt:', err);
+        }
+      }
+    });
   };
 
   const handleEdit = (id) => {
@@ -306,6 +329,24 @@ function PromptList() {
           ))}
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
+
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 }

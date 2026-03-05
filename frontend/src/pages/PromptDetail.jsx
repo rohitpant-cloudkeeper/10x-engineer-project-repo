@@ -5,13 +5,17 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
+import Toast from '../components/Toast';
 import CopyButton from '../components/CopyButton';
 import { ArrowLeftIcon, EditIcon, TrashIcon } from '../components/Icons';
+import { useToast } from '../hooks/useToast';
 import './PromptDetail.css';
 
 function PromptDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast, showToast, hideToast } = useToast();
   
   const [prompt, setPrompt] = useState(null);
   const [versions, setVersions] = useState([]);
@@ -22,6 +26,8 @@ function PromptDetail() {
   const [compareMode, setCompareMode] = useState(false);
   const [compareVersions, setCompareVersions] = useState({ from: null, to: null });
   const [comparison, setComparison] = useState(null);
+  const [expandedField, setExpandedField] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'default' });
 
   useEffect(() => {
     fetchPromptData();
@@ -47,15 +53,24 @@ function PromptDetail() {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this prompt?')) return;
-
-    try {
-      await promptsAPI.delete(id);
-      navigate('/');
-    } catch (err) {
-      alert('Failed to delete prompt');
-      console.error('Error deleting prompt:', err);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Prompt',
+      message: 'Are you sure you want to delete this prompt? This action cannot be undone.',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await promptsAPI.delete(id);
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          showToast('Prompt deleted successfully', 'success');
+          navigate('/');
+        } catch (err) {
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          showToast('Failed to delete prompt', 'error');
+          console.error('Error deleting prompt:', err);
+        }
+      }
+    });
   };
 
   const handleViewVersion = async (version) => {
@@ -63,28 +78,41 @@ function PromptDetail() {
       const response = await versionsAPI.getById(id, version);
       setSelectedVersion(response.data);
     } catch (err) {
-      alert('Failed to load version');
+      showToast('Failed to load version', 'error');
       console.error('Error loading version:', err);
     }
   };
 
   const handleRevertVersion = async (version) => {
-    if (!window.confirm(`Revert to version ${version}? This will create a new version.`)) return;
-
-    try {
-      await versionsAPI.revert(id, version);
-      await fetchPromptData();
-      setSelectedVersion(null);
-      alert(`Successfully reverted to version ${version}`);
-    } catch (err) {
-      alert('Failed to revert version');
-      console.error('Error reverting version:', err);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Revert Version',
+      message: `Revert to version ${version}? This will create a new version.`,
+      variant: 'default',
+      onConfirm: async () => {
+        try {
+          await versionsAPI.revert(id, version);
+          await fetchPromptData();
+          setSelectedVersion(null);
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          showToast(`Successfully reverted to version ${version}`, 'success');
+        } catch (err) {
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          showToast('Failed to revert version', 'error');
+          console.error('Error reverting version:', err);
+        }
+      }
+    });
   };
 
   const handleCompare = async () => {
     if (!compareVersions.from || !compareVersions.to) {
-      alert('Please select two versions to compare');
+      showToast('Please select two versions to compare', 'info');
+      return;
+    }
+
+    if (compareVersions.from === compareVersions.to) {
+      showToast('Please select two different versions to compare', 'info');
       return;
     }
 
@@ -96,7 +124,7 @@ function PromptDetail() {
       );
       setComparison(response.data);
     } catch (err) {
-      alert('Failed to compare versions');
+      showToast('Failed to compare versions', 'error');
       console.error('Error comparing versions:', err);
     }
   };
@@ -142,7 +170,7 @@ function PromptDetail() {
 
           <div className="detail-section">
             <h2>Content</h2>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+            <div className="section-actions">
               <CopyButton text={prompt.content} label="Copy Content" />
             </div>
             <pre className="prompt-content-display">{prompt.content}</pre>
@@ -270,7 +298,11 @@ function PromptDetail() {
                       ))}
                     </select>
 
-                    <Button size="small" onClick={handleCompare}>
+                    <Button 
+                      size="small" 
+                      onClick={handleCompare}
+                      disabled={!compareVersions.from || !compareVersions.to || compareVersions.from === compareVersions.to}
+                    >
                       Compare
                     </Button>
                   </div>
@@ -331,37 +363,87 @@ function PromptDetail() {
           <div className="comparison-view">
             <div className="comparison-summary">
               <h4>Changes Summary</h4>
-              <ul>
+              <div className="accordion-list">
                 {Object.entries(comparison.changes || {}).map(([field, status]) => (
-                  <li key={field} className={`change-${status}`}>
-                    <strong>{field}:</strong> {status}
-                  </li>
+                  <div key={field} className="accordion-item">
+                    <button
+                      className={`accordion-header change-${status}`}
+                      onClick={() => setExpandedField(expandedField === field ? null : field)}
+                    >
+                      <span>
+                        <strong>{field}:</strong> {status}
+                      </span>
+                      <span className="accordion-icon">
+                        {expandedField === field ? '−' : '+'}
+                      </span>
+                    </button>
+                    
+                    {expandedField === field && (
+                      <div className="accordion-content">
+                        <div className="comparison-details">
+                          <div className="comparison-column">
+                            <h5>Version {comparison.from_version?.version}</h5>
+                            <div className="version-content">
+                              {field === 'title' && (
+                                <p>{comparison.from_version?.title}</p>
+                              )}
+                              {field === 'content' && (
+                                <pre>{comparison.from_version?.content}</pre>
+                              )}
+                              {field === 'description' && (
+                                <p>{comparison.from_version?.description || 'No description'}</p>
+                              )}
+                              {field === 'tags' && (
+                                <p>{comparison.from_version?.tags?.join(', ') || 'No tags'}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="comparison-column">
+                            <h5>Version {comparison.to_version?.version}</h5>
+                            <div className="version-content">
+                              {field === 'title' && (
+                                <p>{comparison.to_version?.title}</p>
+                              )}
+                              {field === 'content' && (
+                                <pre>{comparison.to_version?.content}</pre>
+                              )}
+                              {field === 'description' && (
+                                <p>{comparison.to_version?.description || 'No description'}</p>
+                              )}
+                              {field === 'tags' && (
+                                <p>{comparison.to_version?.tags?.join(', ') || 'No tags'}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </ul>
-            </div>
-
-            <div className="comparison-details">
-              <div className="comparison-column">
-                <h4>Version {comparison.from_version?.version}</h4>
-                <div className="version-content">
-                  <p><strong>Title:</strong> {comparison.from_version?.title}</p>
-                  <p><strong>Content:</strong></p>
-                  <pre>{comparison.from_version?.content}</pre>
-                </div>
-              </div>
-
-              <div className="comparison-column">
-                <h4>Version {comparison.to_version?.version}</h4>
-                <div className="version-content">
-                  <p><strong>Title:</strong> {comparison.to_version?.title}</p>
-                  <p><strong>Content:</strong></p>
-                  <pre>{comparison.to_version?.content}</pre>
-                </div>
               </div>
             </div>
           </div>
         )}
       </Modal>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
+
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 }
